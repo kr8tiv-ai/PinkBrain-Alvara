@@ -12,50 +12,21 @@ Any Bags.fm token creator can set up a fully automated investment fund that tran
 
 ## Current State
 
-**M001: S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅.** Five of six subsystem proofs complete. All independent subsystems proven and fund data model established — final slice (S06) wires the outbound path end-to-end.
+**M001: Risk Retirement & Subsystem Proof — COMPLETE ✅**
 
-**S01 (Alvara Factory Discovery & BSKT Proof)** delivered:
-- Alvara BSKTs are ERC-721 NFTs (not standard ERC-7621) with custom view functions
-- BSKT creation requires backend-signed MEV-protected swap routes via 1inch
-- Every BSKT must include ≥5% ALVA token allocation (factory-enforced)
-- Factory address (`0x9ee08080`) discovered on Base with full 93-entry verified ABI
-- Artifacts: discovered-contracts.json, mev-findings.json, factory interaction module, 10-check BSKT verification suite
+All six critical subsystems proven independently and the outbound pipeline wired end-to-end. 163 passing unit/integration tests across 8 test files, 25 TypeScript source modules, 11 CLI scripts.
 
-**S02 (deBridge Solana→Base Bridge Proof)** delivered:
-- Typed deBridge DLN REST client wrapping create-tx, order-by-hash, and order-status endpoints
-- Solana VersionedTransaction preparation pipeline: deserialization, blockhash refresh, compute budget injection, signing, submission
-- Live API proof: estimate-only dry-run returned valid Solana→Base USDC estimation from production endpoint
-- 37 unit tests (20 API client, 17 Solana tx) passing with vitest
-- CLI scripts for bridging and status checking
-- Key discovery: create-tx endpoint uses GET (not POST), requires dstChainTokenOutAmount=auto
+| Subsystem | Module | Proof Level |
+|---|---|---|
+| Alvara Factory Discovery | src/alvara/ | Factory at 0x9ee08080, full ABI, MEV analysis confirms backend-signed routes required |
+| deBridge Solana→Base Bridge | src/debridge/ | Live estimate dry-run, typed DLN client, Solana tx pipeline, 37 tests |
+| Bags SDK Fee Share | src/bags/ | SDK wrapper with mock injection, admin/claim functions, 42 tests |
+| Jupiter Swap | src/jupiter/ | Live quote 0.01 SOL → 0.80 USDC, 24 tests |
+| Holder Resolution | src/holders/ | Dual-strategy (Helius DAS + getProgramAccounts), 40 tests |
+| Fund Data Model | src/db/ | Drizzle ORM, 5 tables, 15 CRUD functions, state machine, 28 integration tests |
+| Outbound Pipeline | src/pipeline/ | claim→swap→fee→bridge orchestrator with DB state tracking, 20 tests |
 
-**S03 (Bags SDK Fee Share & Reflection Claiming)** delivered:
-- Complete Bags SDK integration: client wrapper, fee share admin queries, config updates, fee claiming
-- 4 modules: types.ts, client.ts, fee-share.ts, fee-claim.ts with 10 exported functions
-- Client-side basis points validation (sum-to-10000) before any SDK call
-- CLI proof script with --dry-run mode showing all 6 API response shapes
-- 42 unit tests (14 client, 28 fee-share/claim) — all mocked, zero network calls
-- Pattern: functions accept SDK instance as first param for mock injection testability
-
-**S04 (Jupiter Swap & Holder Resolution)** delivered:
-- Jupiter Ultra V3 swap module: getSwapOrder, executeSwap, swapSolToUsdc with structured logging and input validation
-- Dual-strategy SPL holder resolution: getProgramAccounts (universal) + Helius DAS (preferred with auto-fallback)
-- Live API proof: 0.01 SOL → 0.80 USDC quote from Jupiter production endpoint
-- 64 unit tests (24 Jupiter + 40 holder resolution) — all passing
-- CLI scripts: jupiter-swap.ts (--estimate-only), resolve-holders.ts (--mint, --count)
-
-**S05 (Fund Backend & Data Model)** delivered:
-- PostgreSQL 16 Docker Compose service with health checks and named volume
-- Drizzle ORM schema: 4 enums + 5 tables (funds, fundWallets, fundDivestmentConfig, pipelineRuns, transactions)
-- Connection factory with lazy pool init and DATABASE_URL env config
-- Fund repository: 15 typed CRUD functions with db injection for testability
-- Fund lifecycle state machine: 8 states, validated transitions, typed error classes
-- R017 divestment config immutability: update-if-unlocked, reject-if-locked enforcement
-- Basis points validation (holderSplitBps + ownerSplitBps ≤ 10000)
-- 28 integration tests (skip gracefully when PostgreSQL unavailable)
-- db-seed script exercising full data model end-to-end
-
-Remaining: S06 (outbound subsystem integration) wires the end-to-end flow.
+**Next: M002 (Outbound Pipeline: Solana → Alvara)** — accumulation scheduler, Alvara backend API integration for BSKT creation, pipeline retry logic.
 
 ## Architecture / Key Patterns
 
@@ -85,22 +56,23 @@ Remaining: S06 (outbound subsystem integration) wires the end-to-end flow.
 - deBridge create-tx is GET with query params; dstChainTokenOutAmount=auto required
 - Public Solana RPC rejects getProgramAccounts for high-holder-count tokens — use Helius DAS
 
-**Established patterns (S01–S05):**
-- Blockscout free API for Base chain (Etherscan V2 as optional fallback with paid key)
+**Established patterns (M001):**
+- Blockscout free API for Base chain (Etherscan V2 optional fallback with paid key)
 - EIP-1967 proxy detection for Alvara contract resolution
 - Structured JSON logging with module/phase/action fields
-- 250ms delays between sequential RPC reads for public endpoint rate limits
-- BSKT ABI discovery chain: factory → bsktImplementation (beacon) → implementation → logic ABI
-- Thin REST API clients with typed inputs/outputs (no SDK dependencies) — deBridge + Jupiter pattern
-- SDK wrapper with mock injection — functions accept SDK instance, not raw API key — Bags pattern
-- Client-side input validation before SDK/API calls (basis points sum, wallet format, amount > 0)
+- Thin REST API clients with typed inputs/outputs (deBridge + Jupiter pattern)
+- SDK wrapper with mock injection — functions accept SDK instance, not raw API key (Bags pattern)
+- Client-side input validation before SDK/API calls
 - Dual-mode CLI scripts: safe estimate/dry-run vs full execution
 - vitest with fetch mocking and SDK mock injection for unit tests
 - Dual-strategy resolution with automatic fallback (Helius DAS → getProgramAccounts)
-- Integer math (bigint * 10000n / total) for percentage calculation avoiding float drift
-- Drizzle ORM db injection: all repository functions accept `db` parameter for testability
+- Integer math (bigint) for percentage calculation avoiding float drift
+- Drizzle ORM db injection: all repository functions accept `db` parameter
 - Fund lifecycle state machine: Record<FundStatus, FundStatus[]> with typed error classes
-- Integration tests skip gracefully when infrastructure is unavailable (ctx.skip() pattern)
+- Integration tests skip gracefully when infrastructure unavailable (ctx.skip() pattern)
+- Four-phase pipeline orchestration with per-phase DB state tracking
+- Raw SPL Token instruction building from @solana/web3.js primitives
+- BigInt arithmetic for all USDC atomic unit calculations
 
 ## Capability Contract
 
@@ -108,7 +80,7 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 
 ## Milestone Sequence
 
-- [ ] M001: Risk Retirement & Subsystem Proof — S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅, S06 remaining
+- [x] M001: Risk Retirement & Subsystem Proof — COMPLETE ✅
 - [ ] M002: Outbound Pipeline (Solana → Alvara) — Reflections flow automatically from Bags.fm into Alvara baskets
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation

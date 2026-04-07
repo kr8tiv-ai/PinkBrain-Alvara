@@ -12,7 +12,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M001/S05
 - Supporting slices: M002/S01, M003/S01
-- Validation: unmapped
+- Validation: M001/S05: Fund creation with UUID PK, treasury wallet reference, protocolFeeBps field. Schema, repository CRUD, and state machine implemented. Awaits M002 for full end-to-end fund lifecycle.
 - Notes: Each fund gets isolated state in PostgreSQL, separate EVM wallet, separate Solana treasury
 
 ### R002 — Programmatically configure a token's fee share to direct reflections to the fund's treasury wallet using Bags SDK admin endpoints
@@ -23,7 +23,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M001/S03
 - Supporting slices: M002/S01
-- Validation: unmapped
+- Validation: M001/S03: Complete programmatic interface — getAdminTokenList, buildUpdateConfigTransaction (basis points validation), getClaimTransactions, signAndSendClaimTransactions. 42 unit tests, dry-run CLI proof. Awaits live API key validation.
 - Notes: Bags SDK POST /fee-share/config with basis points. Token creator must authorize initial redirect (one-time manual step).
 
 ### R003 — Treasury wallet monitors accumulated reflections and triggers the outbound pipeline when balance exceeds a configurable threshold (default 5 SOL equivalent)
@@ -45,7 +45,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M001/S04
 - Supporting slices: M002/S01
-- Validation: unmapped
+- Validation: M001/S04: Jupiter Ultra V3 swap module (getSwapOrder, executeSwap, swapSolToUsdc). Live API proof: 0.01 SOL → 0.80 USDC quote. 24 unit tests. Integrated in S06 outbound pipeline.
 - Notes: Jupiter SDK or REST API. Must handle slippage protection.
 
 ### R005 — Bridge USDC from Solana to Base or Ethereum via deBridge DLN REST API with 1-2 second fulfillment
@@ -56,7 +56,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M001/S02
 - Supporting slices: M002/S01
-- Validation: unmapped
+- Validation: M001/S02: Typed deBridge DLN client with Solana tx preparation pipeline. Live estimate-only dry-run: 0.20 USDC Solana→Base. 37 unit tests. Full bridge pipeline implemented but not exercised with real funds. Integrated in S06 outbound pipeline.
 - Notes: Solana chain ID 7565164, Base chain ID 8453, Ethereum chain ID 1. deBridge has zero TVL risk (intent-based). Transfer caps mandatory.
 
 ### R007 — Programmatically create an ERC-7621 basket on Alvara's platform by calling the factory contract directly, seeded with minimum 0.1 ETH
@@ -133,7 +133,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M001/S04
 - Supporting slices: M003/S02
-- Validation: unmapped
+- Validation: M001/S04: Dual-strategy holder resolution — getProgramAccounts with SPL Token filters + Helius DAS auto-fallback. Integer bigint math for percentages. 40 unit tests. CLI proof script.
 - Notes: getTokenLargestAccounts returns only 20. Need getProgramAccounts with data size filter for full list. Helius may offer a cleaner API.
 
 ### R014 — Distribute divestment proceeds to up to 100 wallets on Solana via batched SPL token transfers with checkpoint recovery
@@ -366,11 +366,11 @@ This file is the explicit capability and coverage contract for the project.
 
 | ID | Class | Status | Primary owner | Supporting | Proof |
 |---|---|---|---|---|---|
-| R001 | core-capability | active | M001/S05 | M002/S01, M003/S01 | unmapped |
-| R002 | core-capability | active | M001/S03 | M002/S01 | unmapped |
+| R001 | core-capability | active | M001/S05 | M002/S01, M003/S01 | M001/S05: Fund creation with UUID PK, treasury wallet reference, protocolFeeBps field. Schema, repository CRUD, and state machine implemented. Awaits M002 for full end-to-end fund lifecycle. |
+| R002 | core-capability | active | M001/S03 | M002/S01 | M001/S03: Complete programmatic interface — getAdminTokenList, buildUpdateConfigTransaction (basis points validation), getClaimTransactions, signAndSendClaimTransactions. 42 unit tests, dry-run CLI proof. Awaits live API key validation. |
 | R003 | primary-user-loop | active | M002/S01 | M001/S03 | unmapped |
-| R004 | core-capability | active | M001/S04 | M002/S01 | unmapped |
-| R005 | core-capability | active | M001/S02 | M002/S01 | unmapped |
+| R004 | core-capability | active | M001/S04 | M002/S01 | M001/S04: Jupiter Ultra V3 swap module (getSwapOrder, executeSwap, swapSolToUsdc). Live API proof: 0.01 SOL → 0.80 USDC quote. 24 unit tests. Integrated in S06 outbound pipeline. |
+| R005 | core-capability | active | M001/S02 | M002/S01 | M001/S02: Typed deBridge DLN client with Solana tx preparation pipeline. Live estimate-only dry-run: 0.20 USDC Solana→Base. 37 unit tests. Full bridge pipeline implemented but not exercised with real funds. Integrated in S06 outbound pipeline. |
 | R006 | core-capability | validated | M001/S01 | none | S01/T01: Factory discovered at 0x9ee08080 on Base via deployer interaction scanning. Full ABI (93 entries), proxy detection, and machine-readable config in discovered-contracts.json. |
 | R007 | core-capability | active | M001/S01 | M002/S02 | S01/T02: Factory interface proven (createBSKT signature, full ABI). MEV analysis of 5 on-chain txs confirms backend-signed swap routes required — direct creation without Alvara's signing API will revert with InvalidSignature. Integration path documented in mev-findings.json. Capability achievable but requires Alvara backend API integration, not just direct contract calls. |
 | R008 | core-capability | active | M002/S03 | none | unmapped |
@@ -378,7 +378,7 @@ This file is the explicit capability and coverage contract for the project.
 | R010 | primary-user-loop | active | M003/S01 | M001/S05 | unmapped |
 | R011 | core-capability | active | M003/S01 | none | unmapped |
 | R012 | core-capability | active | M003/S02 | none | unmapped |
-| R013 | core-capability | active | M001/S04 | M003/S02 | unmapped |
+| R013 | core-capability | active | M001/S04 | M003/S02 | M001/S04: Dual-strategy holder resolution — getProgramAccounts with SPL Token filters + Helius DAS auto-fallback. Integer bigint math for percentages. 40 unit tests. CLI proof script. |
 | R014 | core-capability | active | M003/S03 | none | unmapped |
 | R015 | core-capability | active | M003/S03 | M001/S05 | unmapped |
 | R016 | core-capability | active | M001/S05 | M002/S01 | unmapped |

@@ -11,4 +11,4 @@ Prove every critical subsystem works independently — Alvara factory discovery 
 | S03 | Bags SDK Fee Share & Reflection Claiming | medium | — | ✅ | Fee share for a test token redirected to a treasury wallet and accumulated fees claimed via Bags SDK |
 | S04 | Jupiter Swap & Holder Resolution | low | — | ✅ | SOL swapped to USDC via Jupiter and top 100 holders resolved for an arbitrary SPL token mint |
 | S05 | Fund Backend & Data Model | low | — | ✅ | PostgreSQL-backed service persisting fund instances with full state tracking, connected to all subsystem modules |
-| S06 | Outbound Subsystem Integration | medium | — | ⬜ | End-to-end outbound flow: claim reflection → Jupiter swap to USDC → deBridge bridge to Base → USDC confirmed on Base |
+| S06 | Outbound Subsystem Integration | medium | — | ✅ | End-to-end outbound flow: claim reflection → Jupiter swap to USDC → deBridge bridge to Base → USDC confirmed on Base |
