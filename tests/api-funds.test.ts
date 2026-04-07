@@ -21,6 +21,18 @@ const mockGetFundWallets = vi.fn();
 const mockGetDivestmentConfig = vi.fn();
 const mockGetTransactionsByFund = vi.fn();
 
+// ── Mock alvara modules (needed because server registers rebalance/emergency routes) ─
+
+vi.mock('../src/alvara/rebalance.js', () => ({
+  rebalanceBSKT: vi.fn(),
+  RebalanceMode: { STANDARD: 0, EMERGENCY_STABLES: 1, REVERT_EMERGENCY: 2 },
+}));
+
+vi.mock('../src/alvara/emergency.js', () => ({
+  emergencyStables: vi.fn(),
+  emergencyRevert: vi.fn(),
+}));
+
 vi.mock('../src/db/fund-repository.js', () => ({
   createFund: (...args: unknown[]) => mockCreateFund(...args),
   setFundWallets: (...args: unknown[]) => mockSetFundWallets(...args),
@@ -31,6 +43,10 @@ vi.mock('../src/db/fund-repository.js', () => ({
   getFundWallets: (...args: unknown[]) => mockGetFundWallets(...args),
   getDivestmentConfig: (...args: unknown[]) => mockGetDivestmentConfig(...args),
   getTransactionsByFund: (...args: unknown[]) => mockGetTransactionsByFund(...args),
+  createPipelineRun: vi.fn(),
+  updatePipelineRun: vi.fn(),
+  getActivePipelineRuns: vi.fn(),
+  getPipelineRunById: vi.fn(),
 }));
 
 // ── Fixtures ───────────────────────────────────────────────────────────

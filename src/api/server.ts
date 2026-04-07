@@ -12,6 +12,8 @@ import { FundNotFound, InvalidStateTransition, ConfigLocked } from '../db/errors
 import { AlvaraApiError } from '../alvara/types.js';
 import healthRoutes from './routes/health.js';
 import fundRoutes from './routes/funds.js';
+import rebalanceRoutes from './routes/rebalance.js';
+import emergencyRoutes from './routes/emergency.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -134,6 +136,8 @@ export async function createServer(deps: ServerDeps): Promise<FastifyInstance> {
   // Register routes
   await app.register(healthRoutes);
   await app.register(fundRoutes);
+  await app.register(rebalanceRoutes);
+  await app.register(emergencyRoutes);
 
   log('serverCreated', { decorations: Object.keys(deps).filter((k) => deps[k as keyof ServerDeps] !== undefined) });
 

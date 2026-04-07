@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T19:45:59.451Z",
+  "exported_at": "2026-04-07T19:51:41.357Z",
   "milestones": [
     {
       "id": "M001",
@@ -1882,19 +1882,32 @@
       "milestone_id": "M002",
       "slice_id": "S05",
       "id": "T02",
-      "title": "Rebalance and emergency routes with snapshot persistence and integration tests",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Added POST /funds/:id/rebalance, POST /funds/:id/emergency, and POST /funds/:id/emergency/revert routes with JSON Schema validation, snapshot persistence via pipeline_runs, bigint serialization, and 18 fastify.inject() integration tests",
+      "status": "complete",
+      "one_liner": "Added POST /funds/:id/rebalance, POST /funds/:id/emergency, and POST /funds/:id/emergency/revert routes with JSON Schema validation, snapshot persistence via pipeline_runs, bigint serialization, and 18 fastify.inject() integration tests",
+      "narrative": "Created rebalance route plugin with POST /funds/:id/rebalance — validates fund exists, has bsktAddress, and EVM clients are available, then calls rebalanceBSKT() and serializes bigint results. Created emergency route plugin with two endpoints: POST /funds/:id/emergency calls emergencyStables() and persists the composition snapshot as a pipeline_run with metadata.type='emergency_snapshot'; POST /funds/:id/emergency/revert retrieves the snapshot from DB (via getActivePipelineRuns filtered by metadata type) or accepts it in the request body, then calls emergencyRevert(). Both plugins include JSON Schema validation, 503 responses when EVM clients are missing, and recursive bigint-to-string serialization. Registered both route plugins in createServer(). Updated existing api-funds.test.ts to mock alvara modules. Wrote 7 rebalance tests and 11 emergency tests covering happy paths, 404, 409, 400, 502, 503, dry run, DB snapshot revert, and body snapshot revert.",
+      "verification_result": "Ran npx vitest run tests/api-rebalance.test.ts tests/api-emergency.test.ts tests/api-funds.test.ts — all 26 tests pass (7 rebalance + 11 emergency + 8 funds). No regressions.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T19:51:41.139Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Added alvara mock stubs to tests/api-funds.test.ts — the new route plugins import alvara modules at registration time, causing beforeEach timeout when those modules aren't mocked.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/api/routes/rebalance.ts",
+        "src/api/routes/emergency.ts",
+        "src/api/schemas/rebalance.ts",
+        "src/api/schemas/emergency.ts",
+        "src/api/server.ts",
+        "tests/api-rebalance.test.ts",
+        "tests/api-emergency.test.ts",
+        "tests/api-funds.test.ts"
+      ],
+      "key_decisions": [
+        "Emergency snapshot persisted as pipeline_run with metadata.type='emergency_snapshot' — reuses existing createPipelineRun() without schema changes",
+        "Revert route tries DB snapshot first, falls back to body snapshot",
+        "Routes return 503 when publicClient/walletClient not decorated (not 500)"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S05\nmilestone: M002\nkey_files:\n  - src/api/routes/rebalance.ts\n  - src/api/routes/emergency.ts\n  - src/api/schemas/rebalance.ts\n  - src/api/schemas/emergency.ts\n  - src/api/server.ts\n  - tests/api-rebalance.test.ts\n  - tests/api-emergency.test.ts\n  - tests/api-funds.test.ts\nkey_decisions:\n  - Emergency snapshot persisted as pipeline_run with metadata.type='emergency_snapshot' — reuses existing createPipelineRun() without schema changes\n  - Revert route tries DB snapshot first, falls back to body snapshot\n  - Routes return 503 when publicClient/walletClient not decorated (not 500)\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:51:41.138Z\nblocker_discovered: false\n---\n\n# T02: Added POST /funds/:id/rebalance, POST /funds/:id/emergency, and POST /funds/:id/emergency/revert routes with JSON Schema validation, snapshot persistence via pipeline_runs, bigint serialization, and 18 fastify.inject() integration tests\n\n**Added POST /funds/:id/rebalance, POST /funds/:id/emergency, and POST /funds/:id/emergency/revert routes with JSON Schema validation, snapshot persistence via pipeline_runs, bigint serialization, and 18 fastify.inject() integration tests**\n\n## What Happened\n\nCreated rebalance route plugin with POST /funds/:id/rebalance — validates fund exists, has bsktAddress, and EVM clients are available, then calls rebalanceBSKT() and serializes bigint results. Created emergency route plugin with two endpoints: POST /funds/:id/emergency calls emergencyStables() and persists the composition snapshot as a pipeline_run with metadata.type='emergency_snapshot'; POST /funds/:id/emergency/revert retrieves the snapshot from DB (via getActivePipelineRuns filtered by metadata type) or accepts it in the request body, then calls emergencyRevert(). Both plugins include JSON Schema validation, 503 responses when EVM clients are missing, and recursive bigint-to-string serialization. Registered both route plugins in createServer(). Updated existing api-funds.test.ts to mock alvara modules. Wrote 7 rebalance tests and 11 emergency tests covering happy paths, 404, 409, 400, 502, 503, dry run, DB snapshot revert, and body snapshot revert.\n\n## Verification\n\nRan npx vitest run tests/api-rebalance.test.ts tests/api-emergency.test.ts tests/api-funds.test.ts — all 26 tests pass (7 rebalance + 11 emergency + 8 funds). No regressions.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/api-rebalance.test.ts tests/api-emergency.test.ts tests/api-funds.test.ts` | 0 | ✅ pass | 11200ms |\n\n## Deviations\n\nAdded alvara mock stubs to tests/api-funds.test.ts — the new route plugins import alvara modules at registration time, causing beforeEach timeout when those modules aren't mocked.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/api/routes/rebalance.ts`\n- `src/api/routes/emergency.ts`\n- `src/api/schemas/rebalance.ts`\n- `src/api/schemas/emergency.ts`\n- `src/api/server.ts`\n- `tests/api-rebalance.test.ts`\n- `tests/api-emergency.test.ts`\n- `tests/api-funds.test.ts`\n",
       "description": "Add rebalance route plugin (src/api/routes/rebalance.ts): POST /funds/:id/rebalance — validates fund exists and has bsktAddress, calls rebalanceBSKT() with request body parameters (newTokens, newWeights, amountIn, mode, dryRun). Returns rebalance result or 502 on Alvara API error.\n\nAdd emergency route plugin (src/api/routes/emergency.ts): POST /funds/:id/emergency — validates fund, calls emergencyStables(), persists snapshot to pipeline_runs metadata (create a pipeline_run with direction='outbound', phase='investing', metadata containing the snapshot JSON), returns result + snapshot. POST /funds/:id/emergency/revert — reads latest emergency snapshot from pipeline_runs metadata (via getActivePipelineRuns or a new query), falls back to request body snapshot if provided, calls emergencyRevert(), returns result.\n\nCreate JSON Schema definitions for rebalance and emergency request/response (src/api/schemas/rebalance.ts, src/api/schemas/emergency.ts).\n\nRegister new route plugins in createServer().\n\nWrite tests/api-rebalance.test.ts: rebalance happy path (200), fund not found (404), fund without bsktAddress (409), invalid body (400), Alvara API error (502), dry run (200).\n\nWrite tests/api-emergency.test.ts: emergency stables happy path (200), emergency revert with DB snapshot (200), emergency revert with body snapshot (200), fund not found (404), Alvara API error (502), dry run (200).\n\nKey constraints:\n- rebalanceBSKT/emergencyStables/emergencyRevert require publicClient + walletClient — if not decorated on server, return 503 Service Unavailable\n- Emergency snapshot persistence uses existing updatePipelineRun() with metadata field — no schema change\n- Snapshot stored as JSON in pipeline_runs.metadata: { type: 'emergency_snapshot', snapshot: { tokens, weights } }\n- Token amounts as strings for bigint safety\n- Tests mock both fund-repository AND alvara modules via vi.mock()\n- All route handlers check server.publicClient/server.walletClient availability before attempting EVM calls",
       "estimate": "2h",
       "files": [
@@ -3189,6 +3202,17 @@
       "verdict": "✅ pass",
       "duration_ms": 1000,
       "created_at": "2026-04-07T19:45:59.361Z"
+    },
+    {
+      "id": 76,
+      "task_id": "T02",
+      "slice_id": "S05",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/api-rebalance.test.ts tests/api-emergency.test.ts tests/api-funds.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 11200,
+      "created_at": "2026-04-07T19:51:41.140Z"
     }
   ]
 }
