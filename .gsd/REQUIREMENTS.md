@@ -32,8 +32,8 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Treasury wallet monitors accumulated reflections and triggers the outbound pipeline when balance exceeds a configurable threshold (default 5 SOL equivalent)
 - Why it matters: Threshold prevents wasteful small-amount bridges where fees eat the principal
 - Source: user
-- Primary owning slice: M002/S01
-- Supporting slices: M001/S03
+- Primary owning slice: M002/S02
+- Supporting slices: M001/S03, M002/S01
 - Validation: unmapped
 - Notes: Scheduled job checks every 6 hours. Threshold configurable per fund at setup.
 
@@ -77,7 +77,7 @@ This file is the explicit capability and coverage contract for the project.
 - Why it matters: Active management is the value prop for fund creators
 - Source: user
 - Primary owning slice: M002/S03
-- Supporting slices: none
+- Supporting slices: M002/S01
 - Validation: unmapped
 - Notes: Two separate on-chain transactions. MEV-protected via Alvara's backend signing. Owner can only change composition, not divestment config.
 
@@ -87,8 +87,8 @@ This file is the explicit capability and coverage contract for the project.
 - Description: The divestment split (% to holders vs % to owner) and trigger conditions are stored on-chain so anyone can verify
 - Why it matters: User said "must be transparent" — on-chain is the only trustless way
 - Source: user
-- Primary owning slice: M001/S05
-- Supporting slices: M003/S01
+- Primary owning slice: M002/S04
+- Supporting slices: M001/S05, M002/S05
 - Validation: unmapped
 - Notes: Custom config registry contract on EVM side. Stores: recipient split (basis points), trigger type (time/threshold/both), trigger params, distribution currency choice.
 
@@ -164,10 +164,10 @@ This file is the explicit capability and coverage contract for the project.
 - Description: The app takes a configurable percentage of each fund's reflections before they enter the outbound pipeline
 - Why it matters: Revenue model for the application
 - Source: user
-- Primary owning slice: M001/S05
-- Supporting slices: M002/S01
-- Validation: unmapped
-- Notes: Deducted on Solana side before bridge. Percentage configurable at platform level.
+- Primary owning slice: M001/S06
+- Supporting slices: M002/S02
+- Validation: M001/S05+S06: protocolFeeBps field on funds table. Protocol fee deduction as raw SPL Token USDC transfer in outbound pipeline (after swap, before bridge). Tested with 0/500/1000 bps values.
+- Notes: Protocol fee deduction already implemented in M001 outbound pipeline (D029). M002/S02 ensures it runs automatically via scheduler.
 
 ### R017 — Once a fund's divestment config is set (split %, triggers, distribution currency), it cannot be changed
 - Class: constraint
@@ -177,7 +177,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M001/S05
 - Supporting slices: M003/S01
-- Validation: unmapped
+- Validation: M001/S05: Divestment config immutability enforced via upsert pattern — update if unlocked, throw ConfigLocked error if lockedAt is set. Integration tests cover lock/reject flow.
 - Notes: Enforced by on-chain contract. No admin override.
 
 ### R018 — Every operation (fee claim, swap, bridge, basket creation, rebalance, redemption, distribution) must produce verifiable on-chain transaction hashes
@@ -209,7 +209,7 @@ This file is the explicit capability and coverage contract for the project.
 - Why it matters: Multi-tenant means multiple funds running simultaneously with isolated failure domains
 - Source: inferred
 - Primary owning slice: M003/S04
-- Supporting slices: M001/S05, M002/S01
+- Supporting slices: M001/S05, M002/S02
 - Validation: unmapped
 - Notes: BullMQ for job scheduling. Each fund has its own state machine instance. Failures in one fund don't affect others.
 
@@ -219,8 +219,8 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Fund creator chooses at setup whether their Alvara basket is deployed on Base or Ethereum mainnet
 - Why it matters: Base has lower gas, Ethereum has deeper liquidity — choice matters per strategy
 - Source: user
-- Primary owning slice: M002/S02
-- Supporting slices: M001/S01
+- Primary owning slice: M002/S01
+- Supporting slices: M001/S01, M002/S04
 - Validation: unmapped
 - Notes: Alvara launched on Base April 2, 2026. Both chains fully supported. deBridge supports both.
 
@@ -253,9 +253,9 @@ This file is the explicit capability and coverage contract for the project.
 - Why it matters: Market crashes or token exploits need immediate de-risking
 - Source: inferred
 - Primary owning slice: M002/S03
-- Supporting slices: none
+- Supporting slices: M002/S01, M002/S05
 - Validation: unmapped
-- Notes: Alvara built-in feature. Suspends normal operations. Manager can revert when stable.
+- Notes: No dedicated emergencyStables function on BSKT contract. Implemented as rebalance() with target weights ~95% USDT + 5% ALVA (D031). Emergency revert is another rebalance back to original weights.
 
 ### R025 — Bridge operations implement automatic retry with exponential backoff, status monitoring, and manual intervention alerts
 - Class: continuity
@@ -368,28 +368,28 @@ This file is the explicit capability and coverage contract for the project.
 |---|---|---|---|---|---|
 | R001 | core-capability | active | M001/S05 | M002/S01, M003/S01 | M001/S05: Fund creation with UUID PK, treasury wallet reference, protocolFeeBps field. Schema, repository CRUD, and state machine implemented. Awaits M002 for full end-to-end fund lifecycle. |
 | R002 | core-capability | active | M001/S03 | M002/S01 | M001/S03: Complete programmatic interface — getAdminTokenList, buildUpdateConfigTransaction (basis points validation), getClaimTransactions, signAndSendClaimTransactions. 42 unit tests, dry-run CLI proof. Awaits live API key validation. |
-| R003 | primary-user-loop | active | M002/S01 | M001/S03 | unmapped |
+| R003 | primary-user-loop | active | M002/S02 | M001/S03, M002/S01 | unmapped |
 | R004 | core-capability | active | M001/S04 | M002/S01 | M001/S04: Jupiter Ultra V3 swap module (getSwapOrder, executeSwap, swapSolToUsdc). Live API proof: 0.01 SOL → 0.80 USDC quote. 24 unit tests. Integrated in S06 outbound pipeline. |
 | R005 | core-capability | active | M001/S02 | M002/S01 | M001/S02: Typed deBridge DLN client with Solana tx preparation pipeline. Live estimate-only dry-run: 0.20 USDC Solana→Base. 37 unit tests. Full bridge pipeline implemented but not exercised with real funds. Integrated in S06 outbound pipeline. |
 | R006 | core-capability | validated | M001/S01 | none | S01/T01: Factory discovered at 0x9ee08080 on Base via deployer interaction scanning. Full ABI (93 entries), proxy detection, and machine-readable config in discovered-contracts.json. |
 | R007 | core-capability | active | M001/S01 | M002/S02 | S01/T02: Factory interface proven (createBSKT signature, full ABI). MEV analysis of 5 on-chain txs confirms backend-signed swap routes required — direct creation without Alvara's signing API will revert with InvalidSignature. Integration path documented in mev-findings.json. Capability achievable but requires Alvara backend API integration, not just direct contract calls. |
-| R008 | core-capability | active | M002/S03 | none | unmapped |
-| R009 | core-capability | active | M001/S05 | M003/S01 | unmapped |
+| R008 | core-capability | active | M002/S03 | M002/S01 | unmapped |
+| R009 | core-capability | active | M002/S04 | M001/S05, M002/S05 | unmapped |
 | R010 | primary-user-loop | active | M003/S01 | M001/S05 | unmapped |
 | R011 | core-capability | active | M003/S01 | none | unmapped |
 | R012 | core-capability | active | M003/S02 | none | unmapped |
 | R013 | core-capability | active | M001/S04 | M003/S02 | M001/S04: Dual-strategy holder resolution — getProgramAccounts with SPL Token filters + Helius DAS auto-fallback. Integer bigint math for percentages. 40 unit tests. CLI proof script. |
 | R014 | core-capability | active | M003/S03 | none | unmapped |
 | R015 | core-capability | active | M003/S03 | M001/S05 | unmapped |
-| R016 | core-capability | active | M001/S05 | M002/S01 | unmapped |
-| R017 | constraint | active | M001/S05 | M003/S01 | unmapped |
+| R016 | core-capability | active | M001/S06 | M002/S02 | M001/S05+S06: protocolFeeBps field on funds table. Protocol fee deduction as raw SPL Token USDC transfer in outbound pipeline (after swap, before bridge). Tested with 0/500/1000 bps values. |
+| R017 | constraint | active | M001/S05 | M003/S01 | M001/S05: Divestment config immutability enforced via upsert pattern — update if unlocked, throw ConfigLocked error if lockedAt is set. Integration tests cover lock/reject flow. |
 | R018 | quality-attribute | active | M004/S03 | all | unmapped |
 | R019 | quality-attribute | active | M003/S04 | all | unmapped |
-| R020 | core-capability | active | M003/S04 | M001/S05, M002/S01 | unmapped |
-| R021 | core-capability | active | M002/S02 | M001/S01 | unmapped |
+| R020 | core-capability | active | M003/S04 | M001/S05, M002/S02 | unmapped |
+| R021 | core-capability | active | M002/S01 | M001/S01, M002/S04 | unmapped |
 | R022 | launchability | active | M004/S01 | none | unmapped |
 | R023 | failure-visibility | active | M004/S02 | none | unmapped |
-| R024 | continuity | active | M002/S03 | none | unmapped |
+| R024 | continuity | active | M002/S03 | M002/S01, M002/S05 | unmapped |
 | R025 | continuity | active | M003/S02 | M001/S02 | unmapped |
 | R026 | quality-attribute | active | M003/S04 | M001/S05 | unmapped |
 | R027 | quality-attribute | active | M004/S03 | all | unmapped |

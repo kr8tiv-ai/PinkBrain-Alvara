@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T10:07:23.102Z",
+  "exported_at": "2026-04-07T10:21:06.110Z",
   "milestones": [
     {
       "id": "M001",
@@ -23,22 +23,71 @@
     },
     {
       "id": "M002",
-      "title": "",
+      "title": "Outbound Pipeline (Solana → Alvara)",
       "status": "active",
       "depends_on": [],
       "created_at": "2026-04-07T05:03:46.012Z",
       "completed_at": null,
-      "vision": "",
-      "success_criteria": [],
-      "key_risks": [],
-      "proof_strategy": [],
-      "verification_contract": "",
-      "verification_integration": "",
-      "verification_operational": "",
-      "verification_uat": "",
-      "definition_of_done": [],
-      "requirement_coverage": "",
-      "boundary_map_markdown": ""
+      "vision": "Wire M001's proven subsystems into a fully automated outbound pipeline: reflections accumulate → threshold triggers → swap → bridge → contribute to Alvara basket. Plus rebalancing, emergency controls, on-chain divestment config registry, and REST API for fund management.",
+      "success_criteria": [
+        "A fund accumulates reflections, hits threshold, and the outbound pipeline fires automatically",
+        "USDC arrives on Base, is swapped to ETH, and contributed to an Alvara BSKT without manual steps",
+        "The fund completes at least 2 accumulation→contribution cycles successfully",
+        "Rebalancing works via reverse-engineered Alvara backend API",
+        "Emergency Stables converts a basket to stablecoins and reverts back",
+        "Divestment config is stored immutably on-chain and readable by anyone",
+        "REST API endpoints allow fund creation, status queries, rebalance, and emergency operations"
+      ],
+      "key_risks": [
+        {
+          "risk": "Alvara backend API may require session auth tied to the bskt.alvara.xyz frontend — wallet signatures, CSRF tokens, or IP restrictions could block programmatic access",
+          "whyItMatters": "Every BSKT write operation except plain withdraw() requires backend-signed swap routes. If the API is inaccessible, contribute, rebalance, and emergency stables are all blocked."
+        },
+        {
+          "risk": "contribute() requires ETH as msg.value, not USDC — an EVM-side USDC→ETH swap step is needed that doesn't exist in the codebase",
+          "whyItMatters": "The bridge delivers USDC to Base. Without a USDC→ETH conversion, contributed value cannot reach the BSKT."
+        },
+        {
+          "risk": "Pipeline checkpoint recovery under concurrent funds — multiple funds may have pipelines in different stages simultaneously",
+          "whyItMatters": "Without per-fund isolation and proper locking, concurrent pipeline runs could corrupt state or double-spend."
+        },
+        {
+          "risk": "Foundry installation and Solidity toolchain on WSL+Windows environment",
+          "whyItMatters": "The registry contract requires Foundry (forge) which is Unix-only. CI and local dev must handle this cross-platform."
+        }
+      ],
+      "proof_strategy": [
+        {
+          "riskOrUnknown": "Alvara backend API accessibility and signing flow",
+          "retireIn": "S01",
+          "whatWillBeProven": "Successful contribute() call to a real BSKT on Base using backend-signed swap routes obtained programmatically"
+        },
+        {
+          "riskOrUnknown": "Pipeline checkpoint recovery works across restarts",
+          "retireIn": "S02",
+          "whatWillBeProven": "Pipeline interrupted mid-run resumes from last completed phase without re-executing earlier phases"
+        },
+        {
+          "riskOrUnknown": "On-chain registry gas costs and immutability enforcement",
+          "retireIn": "S04",
+          "whatWillBeProven": "DivestmentRegistry stores config, rejects mutations after lock, and gas cost is under 500k for registration"
+        }
+      ],
+      "verification_contract": "Not provided.",
+      "verification_integration": "Not provided.",
+      "verification_operational": "Not provided.",
+      "verification_uat": "Not provided.",
+      "definition_of_done": [
+        "All 5 slices complete with passing verification",
+        "End-to-end pipeline test: claim → swap → fee → bridge → invest completes without manual intervention",
+        "Rebalance and emergency stables both work through Alvara backend API",
+        "DivestmentRegistry contract deployed and tested on Base (at minimum)",
+        "REST API serves all fund management operations with proper error handling",
+        "163+ existing tests still pass (no regressions)",
+        "Pipeline checkpoint resumption tested — kill mid-run, verify resume from last completed phase"
+      ],
+      "requirement_coverage": "**M002-primary requirements:**\n- R003 (accumulation threshold trigger) → S02 primary\n- R008 (basket rebalancing) → S03 primary\n- R024 (emergency stables) → S03 primary\n\n**M002-supporting requirements:**\n- R001 (fund creation) → S05 supporting (REST API surface)\n- R007 (BSKT creation) → S01 supporting (extends with contribute flow)\n- R009 (on-chain divestment config) → S04 primary for on-chain portion (M001/S05 owns DB-side)\n- R016 (protocol fee) → S02 supporting (already implemented, now automated)\n- R017 (config immutability) → S04 supporting (on-chain enforcement)\n- R020 (central orchestrator) → S02 supporting (scheduler component)\n- R021 (dual-chain support) → S01 supporting (Base contribution proven)\n\n**No orphaned Active requirements.** All M002-relevant requirements mapped to slices.",
+      "boundary_map_markdown": "```\n┌─────────────────────────────────────────────────────────────────┐\n│                        M002 Boundary Map                        │\n├─────────────────────────────────────────────────────────────────┤\n│                                                                 │\n│  S01: Alvara Backend API ──────────┬──────> S02: Scheduler      │\n│  (reverse-engineer signing,        │        (BullMQ, threshold, │\n│   contribute, USDC→ETH swap)       │        checkpoint, invest) │\n│                                    │                            │\n│                                    └──────> S03: Rebalance      │\n│                                             (rebalance, emerg)  │\n│                                                                 │\n│  S04: On-Chain Registry ─────────────────> S05: REST API        │\n│  (Solidity, Foundry, TypeScript)   ┌─────> (Fastify, routes,   │\n│                                    │        wraps S01-S04)      │\n│  S01 ─────────────────────────────>│                            │\n│  S02 ─────────────────────────────>│                            │\n│  S03 ─────────────────────────────>┘                            │\n│                                                                 │\n│  External boundaries:                                           │\n│  ├── Alvara backend API (bskt.alvara.xyz) — S01 discovers       │\n│  ├── 1inch API or Uniswap (USDC→ETH on Base) — S01 builds      │\n│  ├── BullMQ + Redis — S02 introduces                            │\n│  ├── Foundry toolchain — S04 introduces                         │\n│  └── M001 subsystem modules — all slices consume                │\n└─────────────────────────────────────────────────────────────────┘\n```"
     },
     {
       "id": "M003",
@@ -197,6 +246,115 @@
       "proof_level": "This slice proves: integration (subsystem composition with state tracking). Real runtime required: no (unit tests with mocks prove orchestration logic). Human/UAT required: no.",
       "integration_closure": "Upstream surfaces consumed: `src/bags/fee-claim.ts` (getClaimTransactions, signAndSendClaimTransactions), `src/jupiter/swap.ts` (swapSolToUsdc), `src/debridge/api.ts` (createBridgeOrder, waitForFulfillment), `src/debridge/solana-tx.ts` (prepareSolanaTransaction, sendAndConfirmBridgeTransaction), `src/db/fund-repository.ts` (getFundById, getFundWallets, createPipelineRun, updatePipelineRun, recordTransaction), `src/config/solana.ts` (SOLANA_KNOWN_ADDRESSES). New wiring introduced: `src/pipeline/outbound.ts` composes all subsystems into a single pipeline function. What remains: trigger automation (M002/S01 scheduled jobs), inbound pipeline (M003), full e2e with live chains.",
       "observability_impact": "Runtime signals: structured JSON logs at each phase transition (claim/swap/fee/bridge) with amounts, tx hashes, and timing. Inspection surfaces: pipeline_runs table (phase, status, error, metadata), transactions table (per-operation tx hashes). Failure visibility: pipeline run records last error, failed phase, and timestamp — queryable via getActivePipelineRuns. Redaction constraints: no secrets logged (wallet addresses are public, amounts are non-sensitive).",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M002",
+      "id": "S01",
+      "title": "Alvara Backend API & BSKT Investment",
+      "status": "pending",
+      "risk": "high",
+      "depends": [],
+      "demo": "Run a CLI script that takes ETH on Base, obtains backend-signed swap routes from Alvara's API, calls contribute() on a real BSKT contract, and verifies LP token balance increased. The Alvara backend API client is reusable by S03 for rebalancing.",
+      "created_at": "2026-04-07T10:21:06.078Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Reverse-engineer Alvara's backend signing API from bskt.alvara.xyz, build a programmatic client for it, and prove that we can contribute ETH to an existing Alvara BSKT with backend-signed swap routes. Includes USDC→ETH swap on Base for converting bridged funds.",
+      "success_criteria": "- Alvara backend API endpoints discovered and documented\\n- backend-api.ts client handles authentication and route signing\\n- contribute.ts wrapper sends ETH to BSKT with backend-signed routes\\n- USDC→ETH swap module works on Base (via 1inch or Uniswap)\\n- LP token balance increases after contribution\\n- bskt_contribute added to operation enum, bsktTokenId added to funds schema\\n- Unit and integration tests for all new modules",
+      "proof_level": "Live on-chain proof — real BSKT contribution on Base mainnet or verifiable testnet",
+      "integration_closure": "Exports contribute() and getSignedSwapRoutes() that S02 pipeline and S03 rebalance consume directly",
+      "observability_impact": "Structured JSON logs for backend API calls (request/response timing, route count, signature validation). Error logs include API response status and body for debugging auth failures.",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M002",
+      "id": "S02",
+      "title": "Accumulation Scheduler & Automated Pipeline",
+      "status": "pending",
+      "risk": "medium",
+      "depends": [
+        "S01"
+      ],
+      "demo": "Create a fund with a low threshold, manually seed its treasury wallet, wait for the scheduler to detect the balance exceeds threshold, and watch the full pipeline fire: claim → swap → fee → bridge → invest. Verify the BSKT received a contribution. Kill the service mid-pipeline and restart — verify it resumes from the last completed phase.",
+      "created_at": "2026-04-07T10:21:06.078Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Build the BullMQ-based accumulation scheduler that polls active funds every 6 hours, checks balance thresholds, and triggers the outbound pipeline automatically. Extend the pipeline with checkpoint resumption (D013) and the investing phase that calls S01's contribute module. Add per-fund concurrency guards.",
+      "success_criteria": "- BullMQ worker polls active funds on 6-hour cron schedule\\n- Threshold check compares fund balance to configurable accumulationThresholdLamports\\n- Pipeline extended with phase 5 (investing) calling contribute()\\n- Checkpoint resumption: pipeline reads last completed phase from DB and skips completed steps\\n- Per-fund Redis lock prevents concurrent pipeline runs for the same fund\\n- Schema additions: accumulationThresholdLamports, lastPipelineRunAt on funds table\\n- Docker Compose updated with Redis service\\n- Dead-letter queue for failed jobs\\n- Tests for scheduler, threshold, checkpoint, and concurrency logic",
+      "proof_level": "Integration proof — scheduler triggers pipeline end-to-end with real DB and Redis (BSKT contribution may use test harness if S01 proves the live path)",
+      "integration_closure": "Scheduler is the runtime entry point for the automated pipeline. S05 REST API can trigger manual pipeline runs via the same queue.",
+      "observability_impact": "BullMQ job status visible via Bull Dashboard or structured logs. Pipeline phase transitions logged with fund ID, run ID, phase, and timestamp. Failed jobs emit error with phase context and retry count.",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M002",
+      "id": "S03",
+      "title": "Rebalancing & Emergency Controls",
+      "status": "pending",
+      "risk": "medium",
+      "depends": [
+        "S01"
+      ],
+      "demo": "Run a CLI script that triggers a rebalance on a real BSKT — changes token weights, verifies BSKTRebalanced event emitted. Then trigger Emergency Stables — verify basket converts to ~95% USDT + 5% ALVA. Trigger revert — verify original composition restored.",
+      "created_at": "2026-04-07T10:21:06.078Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Build rebalance and emergency stables capabilities using S01's proven Alvara backend API client. Rebalancing changes basket composition via the rebalance() contract function with backend-signed routes. Emergency Stables is a rebalance to ~95% USDT + 5% ALVA. Emergency revert restores original weights.",
+      "success_criteria": "- rebalance.ts wrapper calls rebalance() with backend-signed routes and new weights\\n- emergency.ts implements emergencyStables (rebalance to USDT+ALVA) and revertEmergency\\n- Both use S01's backend-api.ts client for swap route signing\\n- BSKTRebalanced event parsed and logged after each operation\\n- Fund status transitions: active → paused (emergency) → active (revert)\\n- Unit and integration tests for rebalance and emergency flows",
+      "proof_level": "Live on-chain proof — real rebalance on a BSKT on Base, verified by reading updated constituent weights",
+      "integration_closure": "Exports rebalance() and emergencyStables() consumed by S05 REST API endpoints",
+      "observability_impact": "Rebalance operations logged with old weights, new weights, and tx hash. Emergency stables state change logged with fund ID and timestamp.",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M002",
+      "id": "S04",
+      "title": "On-Chain Divestment Config Registry",
+      "status": "pending",
+      "risk": "low",
+      "depends": [],
+      "demo": "Deploy DivestmentRegistry on Base testnet/mainnet. Register a fund's divestment config via TypeScript client. Read it back from a different wallet. Attempt to overwrite — verify it reverts. Verify gas cost is reasonable (<500k gas for registration).",
+      "created_at": "2026-04-07T10:21:06.078Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Deploy a Solidity registry contract that stores immutable divestment configurations per fund. Any wallet can read a fund's config (holder split, owner split, trigger type, trigger params, distribution currency). Config is locked on write and cannot be updated — trustless verifiability for holders.",
+      "success_criteria": "- DivestmentRegistry.sol with registerConfig() (one-time write) and getConfig() (public read)\\n- Config struct: holderSplitBps, ownerSplitBps, triggerType, triggerParams, distributionCurrency, creator, registeredAt\\n- Immutability: registerConfig reverts if fundId already registered\\n- Forge test suite covering registration, read, duplicate rejection, and edge cases\\n- TypeScript client in src/registry/ for read/write\\n- Deploy script for Base (Ethereum deployment deferred to integration if gas costs warrant)\\n- Foundry project under contracts/",
+      "proof_level": "On-chain proof — deployed contract with verified source, config stored and readable",
+      "integration_closure": "Exports registerDivestmentConfig() and getDivestmentConfig() for S05 REST API to call at fund creation time",
+      "observability_impact": "Registration tx hash logged. Config readable by anyone via public view function — no platform dependency for verification.",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M002",
+      "id": "S05",
+      "title": "REST API & Fund Management",
+      "status": "pending",
+      "risk": "low",
+      "depends": [
+        "S01",
+        "S02",
+        "S03",
+        "S04"
+      ],
+      "demo": "Using curl: POST /funds to create a fund with name, token mint, chain, divestment config, and basket composition. GET /funds/:id to see status, wallet addresses, and pipeline history. POST /funds/:id/rebalance with new weights. POST /funds/:id/emergency to trigger stables conversion. POST /funds/:id/emergency/revert to restore.",
+      "created_at": "2026-04-07T10:21:06.079Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Build a Fastify REST API that exposes all fund management operations: create fund (with wallet generation, config locking, and registry registration), get fund status, trigger rebalance, trigger emergency stables, and revert emergency. This is the entry point for M004's frontend.",
+      "success_criteria": "- Fastify server with typed route schemas (JSON Schema validation)\\n- POST /funds — creates fund, generates wallets, locks divestment config, registers on-chain\\n- GET /funds/:id — returns fund status, wallets, pipeline runs, BSKT info\\n- POST /funds/:id/rebalance — triggers rebalance with new weights\\n- POST /funds/:id/emergency — triggers Emergency Stables\\n- POST /funds/:id/emergency/revert — reverts emergency\\n- Error handling middleware with structured error responses\\n- Request/response logging\\n- Health check endpoint\\n- Integration tests for all endpoints",
+      "proof_level": "Integration proof — API tests with real DB, mocked external services",
+      "integration_closure": "REST API is the public interface consumed by M004 frontend. All operations route through the API — no direct module imports from the frontend.",
+      "observability_impact": "Request/response logging with correlation IDs. Error responses include structured error codes for frontend consumption. Health check exposes service status, DB connectivity, and Redis connectivity.",
       "sequence": 0,
       "replan_triggered_at": null
     }
