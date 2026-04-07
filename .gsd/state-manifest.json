@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T07:57:55.160Z",
+  "exported_at": "2026-04-07T08:21:00.742Z",
   "milestones": [
     {
       "id": "M001",
@@ -104,14 +104,14 @@
       "milestone_id": "M001",
       "id": "S02",
       "title": "deBridge Solana→Base Bridge Proof",
-      "status": "pending",
+      "status": "complete",
       "risk": "high",
       "depends": [],
       "demo": "USDC bridged from Solana to Base via deBridge DLN API with verifiable tx hashes on both chains",
       "created_at": "2026-04-07T04:43:57.107Z",
-      "completed_at": null,
-      "full_summary_md": "",
-      "full_uat_md": "",
+      "completed_at": "2026-04-07T08:00:27.066Z",
+      "full_summary_md": "---\nid: S02\nparent: M001\nmilestone: M001\nprovides:\n  - deBridge DLN typed API client (src/debridge/api.ts, types.ts)\n  - Solana VersionedTransaction preparation pipeline (src/debridge/solana-tx.ts)\n  - Solana chain config and keypair utilities (src/config/solana.ts)\n  - Bridge and status CLI scripts (scripts/bridge-sol-to-base.ts, scripts/check-bridge-status.ts)\n  - vitest test framework configured with 37 passing tests\nrequires:\n  []\naffects:\n  - S05\n  - S06\nkey_files:\n  - src/debridge/types.ts\n  - src/debridge/api.ts\n  - src/debridge/solana-tx.ts\n  - src/config/solana.ts\n  - scripts/bridge-sol-to-base.ts\n  - scripts/check-bridge-status.ts\n  - tests/debridge-api.test.ts\n  - tests/solana-tx.test.ts\n  - vitest.config.ts\nkey_decisions:\n  - deBridge DLN create-tx uses GET not POST — corrected from plan\n  - dstChainTokenOutAmount=auto is required for create-tx\n  - vitest chosen as project test framework\n  - Solana tx preparation uses decompile/recompile pattern for compute budget injection\npatterns_established:\n  - Thin REST API client with typed inputs/outputs (no SDK dependency)\n  - Structured JSON logging with module/phase/action fields\n  - Dual-mode scripts: estimate-only (safe, no wallet) vs full execution\n  - vitest with fetch mocking for API client unit tests\nobservability_surfaces:\n  - Structured JSON logs with module/phase/action fields on all API calls and tx lifecycle events\n  - scripts/check-bridge-status.ts as standalone diagnostic tool for order tracking\n  - estimate-only mode as connectivity health check (no wallet needed)\ndrill_down_paths:\n  - .gsd/milestones/M001/slices/S02/tasks/T01-SUMMARY.md\n  - .gsd/milestones/M001/slices/S02/tasks/T02-SUMMARY.md\n  - .gsd/milestones/M001/slices/S02/tasks/T03-SUMMARY.md\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-04-07T08:00:27.067Z\nblocker_discovered: false\n---\n\n# S02: deBridge Solana→Base Bridge Proof\n\n**Typed deBridge DLN client with Solana tx preparation pipeline and live API proof — 0.20 USDC Solana→Base estimation verified against production endpoint**\n\n## What Happened\n\nBuilt a complete deBridge DLN integration in three tasks. T01 established the typed foundation: TypeScript interfaces for all DLN API request/response shapes, a thin REST client wrapping three endpoints (create-tx, order-by-hash, order-status), Solana chain configuration with connection factory and keypair loader, and vitest as the project test framework with 20 unit tests covering happy paths and error cases.\n\nT02 added the Solana transaction execution engine: hex deserialization of API-returned VersionedTransactions, blockhash refresh, compute unit simulation with graceful fallback, compute budget injection via decompile/recompile, priority fee calculation from recent fees, signing, and send-with-confirmation. 17 additional unit tests cover hex validation, deserialization edge cases, and error paths.\n\nT03 wired everything into two executable scripts. `bridge-sol-to-base.ts` supports both estimate-only mode (no wallet needed) and full bridge mode (creates order → prepares Solana tx → signs → sends → polls for fulfillment). `check-bridge-status.ts` queries order status by order ID or tx hash. During the live dry-run, the API client's HTTP method was corrected from POST to GET (the plan incorrectly specified POST), and the required `dstChainTokenOutAmount=auto` parameter was added. The corrected estimate-only dry-run returned a valid estimation: 0.20 USDC Solana → 0.20 USDC Base with fees, proving end-to-end API connectivity.\n\nAll 37 tests pass, all S02 source files compile clean. The only pre-existing TS error is in `discover-factory.ts` from S01 (unrelated viem type mismatch).\n\n## Verification\n\n1. `npx tsc --noEmit` on all S02 files — exits 0, zero errors.\n2. `npx vitest run` — 37 tests pass (20 debridge-api, 17 solana-tx).\n3. `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20` — exits 0, returns live estimation: 1.12 USDC input → 0.20 USDC output on Base with 15M fixFee.\n4. Both scripts respond correctly to --help.\n\n## Requirements Advanced\n\n- R005 — Live dry-run estimation proved deBridge DLN API connectivity for Solana→Base USDC bridging. Full bridge pipeline (tx prep, signing, submission, polling) implemented but not yet exercised with real funds.\n\n## Requirements Validated\n\nNone.\n\n## New Requirements Surfaced\n\nNone.\n\n## Requirements Invalidated or Re-scoped\n\nNone.\n\n## Deviations\n\ndeBridge create-tx endpoint uses GET not POST as the plan specified. Added required dstChainTokenOutAmount=auto parameter. Both corrections discovered during T03 live testing and documented in K008.\n\n## Known Limitations\n\nFull bridge mode (with real funds) is untested — only estimate-only mode was exercised against the live API. The orderId field is undefined in estimate-only responses (expected — no order is created without authority addresses). Priority fee calculation in solana-tx.ts uses a median of recent fees which may not be optimal during congestion.\n\n## Follow-ups\n\nS06 will need to wire the bridge module into the full outbound flow: claim → swap → bridge. The waitForFulfillment polling logic (5s intervals, 60 max attempts) may need tuning based on real bridge latency observed during S06 integration testing.\n\n## Files Created/Modified\n\n- `src/debridge/types.ts` — TypeScript interfaces for DeBridge chain IDs, order input/response, and order status\n- `src/debridge/api.ts` — DeBridge DLN REST client: createBridgeOrder, getOrderIdByTxHash, getOrderStatus, waitForFulfillment\n- `src/debridge/solana-tx.ts` — Solana VersionedTransaction preparation: deserialization, blockhash refresh, compute budget, signing, submission\n- `src/config/solana.ts` — Solana known addresses, connection factory, keypair loader\n- `scripts/bridge-sol-to-base.ts` — CLI bridge script with estimate-only and full bridge modes\n- `scripts/check-bridge-status.ts` — CLI status checker by order ID or tx hash\n- `tests/debridge-api.test.ts` — 20 unit tests for deBridge API client\n- `tests/solana-tx.test.ts` — 17 unit tests for Solana tx preparation\n- `vitest.config.ts` — Vitest configuration\n- `package.json` — Added vitest, @solana/web3.js, bs58 deps; bridge/status/test scripts\n",
+      "full_uat_md": "# S02: deBridge Solana→Base Bridge Proof — UAT\n\n**Milestone:** M001\n**Written:** 2026-04-07T08:00:27.067Z\n\n# S02: deBridge Solana→Base Bridge Proof — UAT\n\n**Milestone:** M001\n**Written:** 2026-04-07\n\n## UAT Type\n\n- UAT mode: mixed (artifact-driven unit tests + live API integration test)\n- Why this mode is sufficient: The core proof is API connectivity to a production endpoint. Unit tests validate client logic; the live dry-run proves the real API accepts our requests and returns valid data.\n\n## Preconditions\n\n- Node.js 18+ and npm installed\n- Project dependencies installed (`npm install`)\n- Internet access (deBridge DLN API is public, no key required)\n- No wallet or private key needed for estimate-only tests\n\n## Smoke Test\n\nRun `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20` — should exit 0 and print estimation with non-zero USDC amounts for both input and output.\n\n## Test Cases\n\n### 1. TypeScript Compilation\n\n1. Run `npx tsc --noEmit src/debridge/types.ts src/debridge/api.ts src/debridge/solana-tx.ts src/config/solana.ts scripts/bridge-sol-to-base.ts scripts/check-bridge-status.ts`\n2. **Expected:** Exit code 0, no errors.\n\n### 2. Unit Test Suite\n\n1. Run `npx vitest run`\n2. **Expected:** 37 tests pass across 2 test files (debridge-api.test.ts: 20, solana-tx.test.ts: 17). Exit code 0.\n\n### 3. deBridge API Client — Live Estimation\n\n1. Run `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20`\n2. **Expected:** Structured JSON log lines showing createOrder:start → createOrder:done → estimate:done. Final output shows non-zero input amount, non-zero output amount (~0.20 USDC), and a fixFee value. Exit code 0.\n\n### 4. deBridge API Client — Different Amount\n\n1. Run `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 10.00`\n2. **Expected:** Estimation returns with ~10.00 USDC output. Input includes operating expenses. Exit code 0.\n\n### 5. Bridge Script Help Text\n\n1. Run `npx tsx scripts/bridge-sol-to-base.ts --help`\n2. **Expected:** Prints usage information including --estimate-only, --amount flags. Exit code 0.\n\n### 6. Status Script Help Text\n\n1. Run `npx tsx scripts/check-bridge-status.ts --help`\n2. **Expected:** Prints usage information including --order-id and --tx-hash flags. Exit code 0.\n\n### 7. Status Script — Missing Arguments\n\n1. Run `npx tsx scripts/check-bridge-status.ts` (no args)\n2. **Expected:** Prints error indicating --order-id or --tx-hash is required. Non-zero exit code.\n\n## Edge Cases\n\n### 8. Zero Amount Estimation\n\n1. Run `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0`\n2. **Expected:** Either returns a valid estimation with zero/minimal output, or prints a descriptive error from the deBridge API. Should not crash with unhandled exception.\n\n### 9. Very Large Amount\n\n1. Run `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 1000000`\n2. **Expected:** Returns estimation or descriptive API error (e.g., insufficient liquidity). Should not crash.\n\n### 10. Full Bridge Mode Without Env Vars\n\n1. Ensure SOL_PRIVATE_KEY and BASE_WALLET_ADDRESS are NOT set\n2. Run `npx tsx scripts/bridge-sol-to-base.ts --amount 0.20`\n3. **Expected:** Prints error listing missing environment variables with example format. Non-zero exit code. No crash.\n",
       "goal": "Prove deBridge DLN API integration works for bridging USDC from Solana to Base, with typed client, Solana tx preparation, and executable bridge/status scripts.",
       "success_criteria": "- `npx tsc --noEmit` exits 0\n- `npx vitest run` exits 0\n- `npx tsx scripts/bridge-sol-to-base.ts --estimate-only` returns valid estimation\n- All module files exist: src/debridge/api.ts, types.ts, solana-tx.ts\n- Both scripts exist: scripts/bridge-sol-to-base.ts, scripts/check-bridge-status.ts",
       "proof_level": "integration — API client + Solana tx lifecycle + bridge script wiring. Real runtime required (live deBridge API estimation). Human/UAT required for actual bridge execution with real funds.",
@@ -132,11 +132,11 @@
       "completed_at": null,
       "full_summary_md": "",
       "full_uat_md": "",
-      "goal": "Prove Bags SDK fee share redirection and reflection claiming works programmatically",
-      "success_criteria": "Fee share redirected and reflections claimed",
-      "proof_level": "integration",
-      "integration_closure": "Bags SDK module reusable by pipeline",
-      "observability_impact": "Fee share config and claim tx hashes",
+      "goal": "Prove Bags SDK can query fee share admin status, update fee share config to redirect claimers to a treasury wallet, and claim accumulated fees — all programmatically via the official SDK and REST API.",
+      "success_criteria": "- `npm install` succeeds with `@bagsfm/bags-sdk` added to dependencies\n- `npx vitest run tests/bags-client.test.ts` passes — SDK client instantiation, API key validation, ping mock\n- `npx vitest run tests/bags-fee-share.test.ts` passes — admin list query, config update transaction building, claimable position querying, claim transaction building, error handling for all endpoints\n- `scripts/bags-fee-share.ts` executes without errors in `--dry-run` mode, producing structured JSON output showing: admin list query result, claimable positions query result, and transaction payloads ready for signing\n- All modules use structured JSON logging matching the `src/debridge/api.ts` pattern (greppable by module/phase/action)\n- Rate limit headers (`X-RateLimit-Remaining`, `X-RateLimit-Reset`) are captured and logged",
+      "proof_level": "Contract-level proof with real API integration available. Unit tests mock all network calls. The CLI script can exercise real Bags.fm API when `BAGS_API_KEY` is set, or dry-run with mocked responses when not.",
+      "integration_closure": "- Upstream surfaces consumed: `src/config/solana.ts` (connection factory, keypair loading)\n- New wiring introduced: `src/bags/` module exporting client, fee-share, and fee-claim functions; `scripts/bags-fee-share.ts` CLI\n- What remains: S05 (Fund Backend) will import these modules and wire them into the fund lifecycle. S06 (Outbound Integration) will call fee-claim as the first pipeline step.",
+      "observability_impact": "- Runtime signals: Structured JSON logs with `module: 'bags'`, `phase` (init/admin/claim), `action` fields — consistent with debridge module pattern\n- Inspection surfaces: `scripts/bags-fee-share.ts --dry-run` prints full API response shapes; rate limit headers logged on every request\n- Failure visibility: API errors include HTTP status, response body, and rate limit state. Transaction failures include Solana error codes. All errors structured as JSON with `error: true` field.\n- Redaction constraints: `BAGS_API_KEY` and `SOL_PRIVATE_KEY` never logged. Wallet public keys are logged; private keys are not.",
       "sequence": 0,
       "replan_triggered_at": null
     },
@@ -441,6 +441,145 @@
       "observability_impact": "Full pipeline logging: each phase emits structured JSON. Private keys never logged.",
       "full_plan_md": "",
       "sequence": 0
+    },
+    {
+      "milestone_id": "M001",
+      "slice_id": "S03",
+      "id": "T01",
+      "title": "Install @bagsfm/bags-sdk, create src/bags/ client wrapper with types, and 14 passing unit tests",
+      "status": "complete",
+      "one_liner": "Install @bagsfm/bags-sdk, create src/bags/ client wrapper with types, and 14 passing unit tests",
+      "narrative": "Installed @bagsfm/bags-sdk v1.3.5, inspected its actual TypeScript declarations to understand the real export surface. Created src/bags/types.ts with local interfaces that complement SDK types (BagsClientConfig, BagsApiResponse, BagsPingResponse, BagsFeeShareAdmin, BagsFeeShareUpdateConfig, BagsClaimTransaction). Created src/bags/client.ts with createBagsClient() factory, pingApi() for API key validation, fetchWithTimeout(), structured JSON log(), and BAGS_API_BASE constant — all following the debridge module pattern. Created tests/bags-client.test.ts with 14 test cases covering happy paths, timeouts, error responses, malformed responses, empty/whitespace API keys, and structured logging output.",
+      "verification_result": "npx vitest run tests/bags-client.test.ts — 14 tests passed. grep -q '@bagsfm/bags-sdk' package.json — SDK confirmed in dependencies.",
+      "duration": "",
+      "completed_at": "2026-04-07T08:12:14.790Z",
+      "blocker_discovered": false,
+      "deviations": "Adapted type definitions from the plan to reflect actual SDK exports. The SDK already exports BagsClaimablePosition, BagsFeeClaimer, UpdateFeeShareConfigParams — local types wrap these with string addresses for serialization rather than duplicating PublicKey-based types.",
+      "known_issues": "None.",
+      "key_files": [
+        "package.json",
+        "src/bags/types.ts",
+        "src/bags/client.ts",
+        "tests/bags-client.test.ts"
+      ],
+      "key_decisions": [
+        "Adapted planned types to reflect actual SDK exports — local types wrap/complement rather than duplicate SDK's BagsClaimablePosition, BagsFeeClaimer, etc.",
+        "Used vi.mock for BagsSDK constructor to avoid Solana connection overhead in tests"
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S03\nmilestone: M001\nkey_files:\n  - package.json\n  - src/bags/types.ts\n  - src/bags/client.ts\n  - tests/bags-client.test.ts\nkey_decisions:\n  - Adapted planned types to reflect actual SDK exports — local types wrap/complement rather than duplicate SDK's BagsClaimablePosition, BagsFeeClaimer, etc.\n  - Used vi.mock for BagsSDK constructor to avoid Solana connection overhead in tests\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T08:12:14.789Z\nblocker_discovered: false\n---\n\n# T01: Install @bagsfm/bags-sdk, create src/bags/ client wrapper with types, and 14 passing unit tests\n\n**Install @bagsfm/bags-sdk, create src/bags/ client wrapper with types, and 14 passing unit tests**\n\n## What Happened\n\nInstalled @bagsfm/bags-sdk v1.3.5, inspected its actual TypeScript declarations to understand the real export surface. Created src/bags/types.ts with local interfaces that complement SDK types (BagsClientConfig, BagsApiResponse, BagsPingResponse, BagsFeeShareAdmin, BagsFeeShareUpdateConfig, BagsClaimTransaction). Created src/bags/client.ts with createBagsClient() factory, pingApi() for API key validation, fetchWithTimeout(), structured JSON log(), and BAGS_API_BASE constant — all following the debridge module pattern. Created tests/bags-client.test.ts with 14 test cases covering happy paths, timeouts, error responses, malformed responses, empty/whitespace API keys, and structured logging output.\n\n## Verification\n\nnpx vitest run tests/bags-client.test.ts — 14 tests passed. grep -q '@bagsfm/bags-sdk' package.json — SDK confirmed in dependencies.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/bags-client.test.ts` | 0 | ✅ pass | 10300ms |\n| 2 | `grep -q '@bagsfm/bags-sdk' package.json` | 0 | ✅ pass | 100ms |\n\n## Deviations\n\nAdapted type definitions from the plan to reflect actual SDK exports. The SDK already exports BagsClaimablePosition, BagsFeeClaimer, UpdateFeeShareConfigParams — local types wrap these with string addresses for serialization rather than duplicating PublicKey-based types.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `package.json`\n- `src/bags/types.ts`\n- `src/bags/client.ts`\n- `tests/bags-client.test.ts`\n",
+      "description": "Install the @bagsfm/bags-sdk package, create the src/bags/ module with client initialization and type definitions, and write unit tests proving SDK instantiation works.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| npm registry | Retry install once, fail with clear message | 60s timeout on npm install | Check package.json has correct version after install |\n| Bags API /ping | Return structured error with HTTP status | 10s fetch timeout, throw with context | Validate response has `message` field |\n\n## Steps\n\n1. Run `npm install @bagsfm/bags-sdk` and verify it appears in `package.json` dependencies\n2. Create `src/bags/types.ts` with TypeScript interfaces for:\n   - `BagsClientConfig` (apiKey, rpcUrl?, commitment?)\n   - `BagsFeeShareAdmin` (wallet, tokenMints)\n   - `BagsClaimablePosition` (tokenMint, totalClaimableLamportsUserShare, isCustomFeeVault, isMigrated, customFeeVaultClaimerSide?)\n   - `BagsClaimTransaction` (base64-encoded VersionedTransaction, metadata)\n   - `BagsFeeShareUpdateConfig` (baseMint, claimersArray, basisPointsArray, payer, additionalLookupTables?)\n   - `BagsApiResponse<T>` generic wrapper with success/error discrimination\n3. Create `src/bags/client.ts`:\n   - Import `BagsSDK` from `@bagsfm/bags-sdk`\n   - Export `createBagsClient(config: BagsClientConfig)` factory function\n   - Initialize SDK with API key, Solana connection from `src/config/solana.ts`, commitment level\n   - Export a `log()` helper matching the debridge pattern: `{ ts, module: 'bags', phase, action, ...data }`\n   - Export `fetchWithTimeout()` for direct REST calls (reuse debridge pattern)\n   - Add `BAGS_API_BASE` constant: `https://public-api-v2.bags.fm/api/v1`\n   - Add `pingApi(apiKey: string)` function that calls `GET /ping` with `x-api-key` header to validate the key\n4. Create `tests/bags-client.test.ts`:\n   - Mock `globalThis.fetch` following the pattern in `tests/debridge-api.test.ts`\n   - Test: `pingApi` sends correct headers and returns parsed response\n   - Test: `pingApi` throws on timeout\n   - Test: `pingApi` throws on non-200 response with status code in error\n   - Test: `createBagsClient` returns an SDK instance (mock the SDK constructor)\n   - Test: missing API key throws descriptive error\n5. Verify: `npx vitest run tests/bags-client.test.ts` passes\n\n## Must-Haves\n\n- [ ] `@bagsfm/bags-sdk` in package.json dependencies\n- [ ] `src/bags/types.ts` exports all listed interfaces\n- [ ] `src/bags/client.ts` exports `createBagsClient`, `pingApi`, `log`, `fetchWithTimeout`, `BAGS_API_BASE`\n- [ ] `tests/bags-client.test.ts` has 5+ test cases covering happy path and error paths\n- [ ] All tests pass with mocked fetch — zero real network calls\n- [ ] Structured JSON logging matches debridge pattern\n\n## Verification\n\n- `npx vitest run tests/bags-client.test.ts` — all tests pass\n- `grep -q '@bagsfm/bags-sdk' package.json` — SDK installed",
+      "estimate": "45m",
+      "files": [
+        "package.json",
+        "src/bags/types.ts",
+        "src/bags/client.ts",
+        "tests/bags-client.test.ts"
+      ],
+      "verify": "npx vitest run tests/bags-client.test.ts",
+      "inputs": [
+        "`src/config/solana.ts` — Solana connection factory and keypair loading, reused by Bags client",
+        "`src/debridge/api.ts` — reference pattern for structured logging, fetchWithTimeout, and module layout",
+        "`tests/debridge-api.test.ts` — reference pattern for vitest fetch mocking",
+        "`package.json` — add @bagsfm/bags-sdk dependency"
+      ],
+      "expected_output": [
+        "`src/bags/types.ts` — TypeScript interfaces for Bags API request/response shapes",
+        "`src/bags/client.ts` — SDK initialization factory, ping, logging, fetchWithTimeout",
+        "`tests/bags-client.test.ts` — unit tests for client module",
+        "`package.json` — updated with @bagsfm/bags-sdk dependency"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M001",
+      "slice_id": "S03",
+      "id": "T02",
+      "title": "Built fee-share admin query/update and fee claiming modules with 28 passing tests covering happy paths, input validation, error wrapping, and on-chain confirmation",
+      "status": "complete",
+      "one_liner": "Built fee-share admin query/update and fee claiming modules with 28 passing tests covering happy paths, input validation, error wrapping, and on-chain confirmation",
+      "narrative": "Created src/bags/fee-share.ts with three exports (getAdminTokenList, getClaimablePositions, buildUpdateConfigTransaction) and src/bags/fee-claim.ts with two exports (getClaimTransactions, signAndSendClaimTransactions). All functions wrap BagsSDK services with input validation, PublicKey conversion, structured JSON logging, and contextual error wrapping. Client-side basis points validation enforced before SDK call. Tests use mock SDK injection with 28 cases covering happy paths, empty inputs, invalid formats, SDK errors, basis points validation, and on-chain confirmation failure.",
+      "verification_result": "npx vitest run tests/bags-fee-share.test.ts — 28 tests passed. npx vitest run — full suite 79 tests across 4 files, all pass. grep -q '@bagsfm/bags-sdk' package.json — confirmed.",
+      "duration": "",
+      "completed_at": "2026-04-07T08:21:00.702Z",
+      "blocker_discovered": false,
+      "deviations": "Wrapped SDK services directly instead of REST+SDK dual path. Changed function signatures from (apiKey, ...) to (sdk, ...) for testability. signAndSendClaimTransactions takes base64 VersionedMessage bytes matching actual Bags API format.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/bags/fee-share.ts",
+        "src/bags/fee-claim.ts",
+        "tests/bags-fee-share.test.ts"
+      ],
+      "key_decisions": [
+        "Wrapped SDK services directly instead of REST — SDK handles auth and serialization internally",
+        "Functions accept BagsSDK instance as first param for mock injection testability",
+        "Client-side basis points validation (sum to 10000) enforced before any SDK call"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S03\nmilestone: M001\nkey_files:\n  - src/bags/fee-share.ts\n  - src/bags/fee-claim.ts\n  - tests/bags-fee-share.test.ts\nkey_decisions:\n  - Wrapped SDK services directly instead of REST — SDK handles auth and serialization internally\n  - Functions accept BagsSDK instance as first param for mock injection testability\n  - Client-side basis points validation (sum to 10000) enforced before any SDK call\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T08:21:00.701Z\nblocker_discovered: false\n---\n\n# T02: Built fee-share admin query/update and fee claiming modules with 28 passing tests covering happy paths, input validation, error wrapping, and on-chain confirmation\n\n**Built fee-share admin query/update and fee claiming modules with 28 passing tests covering happy paths, input validation, error wrapping, and on-chain confirmation**\n\n## What Happened\n\nCreated src/bags/fee-share.ts with three exports (getAdminTokenList, getClaimablePositions, buildUpdateConfigTransaction) and src/bags/fee-claim.ts with two exports (getClaimTransactions, signAndSendClaimTransactions). All functions wrap BagsSDK services with input validation, PublicKey conversion, structured JSON logging, and contextual error wrapping. Client-side basis points validation enforced before SDK call. Tests use mock SDK injection with 28 cases covering happy paths, empty inputs, invalid formats, SDK errors, basis points validation, and on-chain confirmation failure.\n\n## Verification\n\nnpx vitest run tests/bags-fee-share.test.ts — 28 tests passed. npx vitest run — full suite 79 tests across 4 files, all pass. grep -q '@bagsfm/bags-sdk' package.json — confirmed.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/bags-fee-share.test.ts` | 0 | ✅ pass | 5620ms |\n| 2 | `npx vitest run` | 0 | ✅ pass | 5590ms |\n| 3 | `grep -q '@bagsfm/bags-sdk' package.json` | 0 | ✅ pass | 100ms |\n\n## Deviations\n\nWrapped SDK services directly instead of REST+SDK dual path. Changed function signatures from (apiKey, ...) to (sdk, ...) for testability. signAndSendClaimTransactions takes base64 VersionedMessage bytes matching actual Bags API format.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/bags/fee-share.ts`\n- `src/bags/fee-claim.ts`\n- `tests/bags-fee-share.test.ts`\n",
+      "description": "Build the two core business logic modules — fee share admin query/update and fee claiming — following the patterns established in T01. This is the heart of R002.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| GET /fee-share/admin/list | Return empty admin list with warning log | 10s timeout, throw with endpoint context | Validate response is array, return empty on unexpected shape |\n| POST /fee-share/admin/update-config | Throw with HTTP status + response body | 15s timeout (transaction building is heavier) | Validate `transactions` array exists in response |\n| sdk.fee.getAllClaimablePositions | Throw with wallet context | 15s timeout | Validate positions array, warn on unexpected fields |\n| sdk.fee.getClaimTransactions | Throw with wallet+mint context | 15s timeout | Validate transactions array with base64 check |\n\n## Negative Tests\n\n- **Malformed inputs**: empty wallet address, invalid token mint, null basisPointsArray\n- **Error paths**: 401 unauthorized (bad API key), 429 rate limited (check retry-after), 500 server error\n- **Boundary conditions**: basisPointsArray not summing to 10000, empty claimers array, 0 claimable positions, >7 claimers requiring lookup tables\n\n## Steps\n\n1. Create `src/bags/fee-share.ts`:\n   - Import `log`, `fetchWithTimeout`, `BAGS_API_BASE` from `./client.js`\n   - `getAdminTokenList(apiKey: string, wallet: string): Promise<string[]>` — calls `GET /fee-share/admin/list?wallet={wallet}` with `x-api-key` header. Returns array of token mint addresses where the wallet is fee share admin. Log rate limit headers from response.\n   - `getClaimablePositions(apiKey: string, wallet: string): Promise<BagsClaimablePosition[]>` — calls the SDK's `fee.getAllClaimablePositions(wallet)` or falls back to direct REST `GET /fee/claimable-positions?wallet={wallet}`. Returns structured positions.\n   - `buildUpdateConfigTransaction(apiKey: string, config: BagsFeeShareUpdateConfig): Promise<string[]>` — calls `POST /fee-share/admin/update-config` with JSON body `{ baseMint, claimersArray, basisPointsArray, payer, additionalLookupTables }`. Validates basisPointsArray sums to 10000 before calling API. Returns array of base64-encoded VersionedTransaction strings.\n   - Input validation on all functions: non-empty wallet (base58 format check), non-empty apiKey, valid mint addresses.\n\n2. Create `src/bags/fee-claim.ts`:\n   - Import `log`, `fetchWithTimeout`, `BAGS_API_BASE` from `./client.js`\n   - `getClaimTransactions(apiKey: string, wallet: string, tokenMint: string): Promise<string[]>` — calls the SDK's `fee.getClaimTransactions(wallet, tokenMint)` or falls back to REST. Returns base64-encoded VersionedTransaction strings.\n   - `signAndSendClaimTransactions(connection: Connection, keypair: Keypair, transactions: string[]): Promise<string[]>` — deserializes base64 VersionedTransactions, signs with keypair, sends via connection, waits for confirmation. Returns array of tx signature strings. Logs each tx hash as it confirms. Handles blockhash expiry by checking `lastValidBlockHeight`.\n   - Each function logs entry/exit with structured JSON (phase: 'claim', action: 'get-transactions' | 'sign-send').\n\n3. Create `tests/bags-fee-share.test.ts` (covers both modules):\n   - Mock `globalThis.fetch`\n   - **Admin list tests**: happy path returns mint array, empty wallet throws, 401 returns descriptive error, rate limit headers logged\n   - **Update config tests**: happy path returns transaction array, basisPoints not summing to 10000 throws before API call, empty claimers throws, response missing `transactions` field throws\n   - **Claimable positions tests**: happy path returns typed positions, empty result returns empty array, API error includes HTTP status\n   - **Claim transactions tests**: happy path returns base64 strings, empty token mint throws, 429 rate limit error includes retry-after\n   - **signAndSendClaimTransactions tests**: mock Connection.sendRawTransaction and confirmTransaction, verify tx signatures returned, verify timeout handling\n\n4. Verify: `npx vitest run tests/bags-fee-share.test.ts` passes\n\n## Must-Haves\n\n- [ ] `src/bags/fee-share.ts` exports `getAdminTokenList`, `getClaimablePositions`, `buildUpdateConfigTransaction`\n- [ ] `src/bags/fee-claim.ts` exports `getClaimTransactions`, `signAndSendClaimTransactions`\n- [ ] Basis points validation (must sum to 10000) enforced client-side before API call\n- [ ] Rate limit headers captured and logged on every API response\n- [ ] All functions have input validation with descriptive error messages\n- [ ] Tests cover happy paths, error responses (401, 429, 500), and input validation\n- [ ] Structured JSON logging on all API calls matching `module: 'bags'` pattern\n\n## Verification\n\n- `npx vitest run tests/bags-fee-share.test.ts` — all tests pass\n- `npx vitest run` — full suite passes (no regressions in debridge tests)",
+      "estimate": "1h30m",
+      "files": [
+        "src/bags/fee-share.ts",
+        "src/bags/fee-claim.ts",
+        "tests/bags-fee-share.test.ts"
+      ],
+      "verify": "npx vitest run tests/bags-fee-share.test.ts && npx vitest run",
+      "inputs": [
+        "`src/bags/client.ts` — client factory, log helper, fetchWithTimeout, BAGS_API_BASE from T01",
+        "`src/bags/types.ts` — type definitions from T01",
+        "`src/config/solana.ts` — Connection and Keypair types for signAndSendClaimTransactions",
+        "`tests/bags-client.test.ts` — test pattern reference from T01"
+      ],
+      "expected_output": [
+        "`src/bags/fee-share.ts` — fee share admin query, claimable positions, update config transaction building",
+        "`src/bags/fee-claim.ts` — claim transaction fetching and sign+send with confirmation",
+        "`tests/bags-fee-share.test.ts` — comprehensive unit tests for both modules"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M001",
+      "slice_id": "S03",
+      "id": "T03",
+      "title": "Build end-to-end CLI proof script for fee share and claiming",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Create the CLI script that proves the slice demo: query admin status, update fee share config, query claimable positions, and claim fees. Supports --dry-run mode for testing without a live API key. Update .env.example with BAGS_API_KEY.\n\n## Steps\n\n1. Update `.env.example` — add `BAGS_API_KEY=` with a comment explaining where to get it (`dev.bags.fm`)\n2. Create `scripts/bags-fee-share.ts`:\n   - Parse CLI args: `--dry-run` (use mock data instead of real API), `--wallet <address>` (override default), `--token-mint <address>` (target token), `--treasury <address>` (treasury wallet to add as claimer), `--claim` (actually sign and send claim transactions)\n   - Load env: `dotenv/config`, read `BAGS_API_KEY`, `SOL_PRIVATE_KEY`, `SOL_RPC_URL`\n   - In dry-run mode: print mock response shapes showing what each API call would return (admin list, claimable positions, update-config transaction, claim transactions). Exit 0.\n   - In live mode:\n     a. Call `pingApi(apiKey)` to validate the key\n     b. Call `getAdminTokenList(apiKey, wallet)` — log the mints where wallet is admin\n     c. Call `getClaimablePositions(apiKey, wallet)` — log positions with claimable amounts\n     d. If `--treasury` provided: call `buildUpdateConfigTransaction(apiKey, { baseMint: tokenMint, claimersArray: [wallet, treasury], basisPointsArray: [5000, 5000], payer: wallet })` — log the transaction payload (don't sign unless --claim is passed)\n     e. If `--claim` provided: call `getClaimTransactions(apiKey, wallet, tokenMint)`, then `signAndSendClaimTransactions(connection, keypair, txs)` — log tx hashes\n   - All output is structured JSON to stdout (consistent with other scripts)\n   - Error handling: catch at top level, log structured error with phase, exit 1\n3. Add npm script to `package.json`: `\"bags-fee-share\": \"tsx scripts/bags-fee-share.ts\"`\n4. Verify: `npx tsx scripts/bags-fee-share.ts --dry-run` exits 0 with valid JSON output showing all API response shapes\n5. Verify: `npx vitest run` — full test suite still passes (no regressions)\n\n## Must-Haves\n\n- [ ] `scripts/bags-fee-share.ts` runs in --dry-run mode without any env vars set\n- [ ] Dry-run output shows realistic mock shapes for: admin list, claimable positions, update-config tx, claim tx\n- [ ] Live mode validates BAGS_API_KEY is set before making API calls\n- [ ] Live mode with --claim validates SOL_PRIVATE_KEY is set before signing\n- [ ] All output is structured JSON (one JSON object per line)\n- [ ] npm script `bags-fee-share` added to package.json\n- [ ] .env.example updated with BAGS_API_KEY\n\n## Verification\n\n- `npx tsx scripts/bags-fee-share.ts --dry-run` exits 0 with JSON output\n- `npx vitest run` — full test suite passes",
+      "estimate": "45m",
+      "files": [
+        "scripts/bags-fee-share.ts",
+        "package.json",
+        ".env.example"
+      ],
+      "verify": "npx tsx scripts/bags-fee-share.ts --dry-run && npx vitest run",
+      "inputs": [
+        "`src/bags/client.ts` — createBagsClient, pingApi from T01",
+        "`src/bags/fee-share.ts` — getAdminTokenList, getClaimablePositions, buildUpdateConfigTransaction from T02",
+        "`src/bags/fee-claim.ts` — getClaimTransactions, signAndSendClaimTransactions from T02",
+        "`src/bags/types.ts` — type definitions from T01",
+        "`src/config/solana.ts` — createSolanaConnection, loadSolanaKeypair for live mode"
+      ],
+      "expected_output": [
+        "`scripts/bags-fee-share.ts` — CLI proof script with --dry-run and live modes",
+        "`package.json` — updated with bags-fee-share npm script",
+        "`.env.example` — updated with BAGS_API_KEY entry"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
     }
   ],
   "decisions": [
@@ -719,6 +858,18 @@
       "revisable": "Yes",
       "made_by": "agent",
       "superseded_by": null
+    },
+    {
+      "seq": 24,
+      "id": "D024",
+      "when_context": "M001/S03",
+      "scope": "M001/S03",
+      "decision": "Bags.fm integration approach",
+      "choice": "Use official @bagsfm/bags-sdk (v1.3.5) for fee share and claiming operations, with direct REST fallback for endpoints the SDK doesn't cover",
+      "rationale": "The SDK handles complex Solana program interactions (Meteora DAMM V2 pools, custom fee vaults, virtual pools) internally. Hand-rolling would require understanding 5+ Solana program ABIs. The SDK exports signAndSendTransaction helper for transaction lifecycle. REST fallback covers admin endpoints not in the SDK's TypeScript surface.",
+      "revisable": "Yes — if SDK proves unreliable or lags behind API changes, switch to pure REST",
+      "made_by": "agent",
+      "superseded_by": null
     }
   ],
   "verification_evidence": [
@@ -776,6 +927,61 @@
       "verdict": "✅ pass",
       "duration_ms": 4800,
       "created_at": "2026-04-07T07:57:55.121Z"
+    },
+    {
+      "id": 6,
+      "task_id": "T01",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "npx vitest run tests/bags-client.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 10300,
+      "created_at": "2026-04-07T08:12:14.790Z"
+    },
+    {
+      "id": 7,
+      "task_id": "T01",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "grep -q '@bagsfm/bags-sdk' package.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T08:12:14.790Z"
+    },
+    {
+      "id": 8,
+      "task_id": "T02",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "npx vitest run tests/bags-fee-share.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 5620,
+      "created_at": "2026-04-07T08:21:00.702Z"
+    },
+    {
+      "id": 9,
+      "task_id": "T02",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "npx vitest run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 5590,
+      "created_at": "2026-04-07T08:21:00.702Z"
+    },
+    {
+      "id": 10,
+      "task_id": "T02",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "grep -q '@bagsfm/bags-sdk' package.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T08:21:00.702Z"
     }
   ]
 }
