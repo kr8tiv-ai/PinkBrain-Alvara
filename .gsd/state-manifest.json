@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T20:02:26.386Z",
+  "exported_at": "2026-04-07T20:25:40.971Z",
   "milestones": [
     {
       "id": "M001",
@@ -91,22 +91,75 @@
     },
     {
       "id": "M003",
-      "title": "",
+      "title": "Return Pipeline & Distribution",
       "status": "active",
       "depends_on": [],
       "created_at": "2026-04-07T05:03:46.013Z",
       "completed_at": null,
-      "vision": "",
-      "success_criteria": [],
-      "key_risks": [],
-      "proof_strategy": [],
-      "verification_contract": "",
-      "verification_integration": "",
-      "verification_operational": "",
-      "verification_uat": "",
-      "definition_of_done": [],
-      "requirement_coverage": "",
-      "boundary_map_markdown": ""
+      "vision": "Close the full cycle: auto-divestment triggers fire → Alvara basket redeemed for ETH → ETH swapped to USDC → deBridge bridges USDC back to Solana → top 100 holders receive proportional distribution → fund restarts accumulation. Proven with 3-5 concurrent funds running complete autonomous cycles.",
+      "success_criteria": [
+        "A fund's auto-divestment trigger fires and the full return pipeline (redeem → swap → bridge → distribute) executes without manual intervention",
+        "Top 100 holders receive their proportional USDC (or SOL) distribution with per-transfer on-chain verification",
+        "A fund completes at least 2 full round-trip cycles (accumulate → invest → divest → distribute → accumulate again)",
+        "3-5 funds run concurrently with independent pipelines and isolated failure domains",
+        "Distribution failures are immediately detected, corrected, and verified on-chain (D015)"
+      ],
+      "key_risks": [
+        {
+          "risk": "Alvara withdrawETH backend API has never been called live — endpoint may not exist, require different auth, or return unexpected response shape",
+          "whyItMatters": "If withdrawETH() fails, fallback is withdraw() + N separate token→USDC swaps — significantly more complex and gas-expensive"
+        },
+        {
+          "risk": "deBridge EVM→Solana direction is untested — ERC-20 approval to DlnSource and EVM calldata submission are new code paths",
+          "whyItMatters": "Return bridge is the critical link between EVM redemption proceeds and Solana distribution — no alternative bridge in scope"
+        },
+        {
+          "risk": "Distribution to 100 wallets with per-transfer verification adds latency and failure surface — ATA creation for holders without USDC accounts costs ~0.2 SOL",
+          "whyItMatters": "Distribution is the moment holders receive value — partial or failed distribution destroys trust"
+        },
+        {
+          "risk": "Concurrent fund pipeline isolation — multiple funds sharing EVM wallet may interfere with each other's bridge operations",
+          "whyItMatters": "Multi-tenant isolation is a core promise — one fund's failure or balance confusion must not affect others"
+        }
+      ],
+      "proof_strategy": [
+        {
+          "riskOrUnknown": "Alvara withdrawETH API availability",
+          "retireIn": "S01",
+          "whatWillBeProven": "Live withdrawETH() call via getWithdrawETHRoutes() → LP burned, ETH received, event parsed"
+        },
+        {
+          "riskOrUnknown": "deBridge EVM→Solana bridge direction",
+          "retireIn": "S01",
+          "whatWillBeProven": "USDC approved to DlnSource, EVM bridge tx submitted, USDC arrives on Solana"
+        },
+        {
+          "riskOrUnknown": "Batched SPL distribution with verification",
+          "retireIn": "S02",
+          "whatWillBeProven": "N holders receive USDC/SOL with per-transfer on-chain balance verification"
+        },
+        {
+          "riskOrUnknown": "Concurrent fund isolation",
+          "retireIn": "S04",
+          "whatWillBeProven": "3-5 funds divest and distribute concurrently without balance interference"
+        }
+      ],
+      "verification_contract": "Each slice is verified by: (1) unit tests passing for all new modules, (2) CLI script or API call demonstrating the slice's demo line, (3) on-chain tx hashes for every operation. Final milestone verification: 3+ funds complete autonomous cycles with verifiable distribution to holders.",
+      "verification_integration": "S03 proves single-fund end-to-end inbound pipeline. S04 proves multi-fund concurrent operation. Both are exercised through real code paths (scheduler + pipeline), not test harnesses alone.",
+      "verification_operational": "Pipeline checkpoint recovery tested by simulating mid-pipeline failure and resuming. Distribution verify-fix-verify loop exercised. Fund Engine per-fund error isolation verified by injecting failure in one fund while others continue.",
+      "verification_uat": "Not provided.",
+      "definition_of_done": [
+        "withdrawETH() via Alvara backend API proven live with LP fully burned and ETH received",
+        "deBridge EVM→Solana bridge direction proven with USDC delivered to Solana wallet",
+        "Batched SPL token distribution to 100 wallets with per-transfer verification loop",
+        "Divestment trigger evaluation (time, threshold, both) fires correctly from BullMQ scheduler",
+        "Fund state machine extended with completed→active transition for repeating cycles",
+        "Full inbound pipeline (redeem→swap→bridge→distribute) with checkpoint recovery",
+        "Fund Engine orchestrates N concurrent fund lifecycles with independent failure domains",
+        "Multi-fund proof: 3+ funds complete full autonomous cycle without interference"
+      ],
+      "requirement_coverage": "**Primary owners in M003:**\\n- R010 → S03 (auto-divestment triggers)\\n- R011 → S01 (Alvara redeem for ETH)\\n- R012 → S01 (return bridge EVM→Solana)\\n- R014 → S02 (batched distribution to holders)\\n- R015 → S02 (distribution currency choice USDC/SOL)\\n- R019 → S04 (full automation zero manual steps)\\n- R020 → S04 (Fund Engine multi-fund orchestration)\\n- R025 → S01 (bridge failure recovery)\\n- R026 → S04 (multi-fund parallel execution)\\n\\n**Supporting roles in M003:**\\n- R001 → S01 (fund isolation, wallet lookup)\\n- R013 → S02 (holder resolution reuse from M001)\\n- R017 → S03 (immutable config read for trigger params)\\n- R018 → all (tx hashes persisted for every operation)\\n\\n**Not in M003 scope (primary owner elsewhere):**\\n- R022, R023, R027 → M004\\n- R002, R003, R004, R005, R007, R008, R009, R016, R021, R024 → M001/M002\\n- R028, R029, R030 → deferred\\n- R031, R032 → out of scope",
+      "boundary_map_markdown": "Not provided."
     },
     {
       "id": "M004",
@@ -346,6 +399,91 @@
       "proof_level": "Contract-level — all verification via fastify.inject() against mocked DB/domain layers. No real PostgreSQL, no real EVM clients. Real runtime proof is M003+ concern.",
       "integration_closure": "- Upstream surfaces consumed: `src/db/fund-repository.ts` (all CRUD), `src/alvara/rebalance.ts` (rebalanceBSKT), `src/alvara/emergency.ts` (emergencyStables/emergencyRevert), `src/registry/client.ts` (registerConfig), `src/db/connection.ts` (createDb/getDbPool), `src/db/errors.ts` (FundNotFound/InvalidStateTransition/ConfigLocked)\n- New wiring: Fastify server factory composing all domain modules behind HTTP routes with JSON Schema validation\n- What remains: Nothing — this is the final slice of M002. After this, the full outbound pipeline is API-accessible.",
       "observability_impact": "- Runtime signals: Structured JSON logs from all route handlers (module: 'api', action: per-route)\n- Inspection surfaces: GET /health endpoint for DB connectivity, Fastify built-in request logging\n- Failure visibility: Domain errors mapped to HTTP status codes with structured error body { error, message, details }\n- Redaction constraints: No secrets in request/response logging — Fastify default serializers handle this",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M003",
+      "id": "S01",
+      "title": "Redemption & Return Bridge",
+      "status": "pending",
+      "risk": "high",
+      "depends": [],
+      "demo": "CLI script redeems a BSKT position for ETH, swaps ETH→USDC on Base, bridges USDC to Solana via deBridge. All three phases verified with on-chain tx hashes and balance checks.",
+      "created_at": "2026-04-07T20:11:12.939Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "CLI script redeems a BSKT position for ETH, swaps ETH→USDC on Base, bridges USDC to Solana via deBridge. All three phases verified with on-chain tx hashes and balance checks.",
+      "success_criteria": "- `npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts tests/debridge-evm-tx.test.ts tests/inbound-pipeline.test.ts` — all pass\n- `npx tsx scripts/redeem-bridge.ts --help` exits 0 and shows usage\n- `npx tsc --noEmit` — no type errors in new files\n- Inbound pipeline handles failure at each phase: error persisted to DB, checkpoint written for resume",
+      "proof_level": "This slice proves: contract + integration (mocked subsystems, no live chain calls)\nReal runtime required: no (all tests use mocked RPC/API)\nHuman/UAT required: no",
+      "integration_closure": "Upstream surfaces consumed: `src/alvara/api.ts` (getWithdrawETHRoutes), `src/alvara/bskt-pair.ts` (LP balance reads), `src/evm/swap.ts` (1inch pattern), `src/debridge/api.ts` (createBridgeOrder, waitForFulfillment), `src/pipeline/outbound.ts` (checkpoint pattern), `src/db/fund-repository.ts` (pipeline CRUD), `src/config/chains.ts` (viem clients)\nNew wiring introduced in this slice: `src/alvara/redeem.ts` (withdrawETH orchestration), `swapEthToUsdc()` in `src/evm/swap.ts`, `src/debridge/evm-tx.ts` (EVM bridge submission), `src/pipeline/inbound.ts` (3-phase return pipeline), `scripts/redeem-bridge.ts` (CLI entrypoint)\nWhat remains before the milestone is truly usable end-to-end: S02 distribution engine, S03 auto-divestment triggers wiring inbound pipeline to distribution, S04 multi-fund orchestration",
+      "observability_impact": "Runtime signals: structured JSON logs (module: 'alvara-redeem', 'evm-swap', 'debridge-evm', 'inbound-pipeline') with phase/action for grep-based filtering. Pipeline run rows in pipeline_runs table with direction='inbound', per-phase status. Transaction records for bskt_redeem, swap, bridge_send, bridge_receive operations.\nInspection surfaces: pipeline_runs table (status, phase, error, metadata.checkpoint), transactions table (per-operation tx hashes), CLI script --dry-run output\nFailure visibility: pipeline_runs.error + pipeline_runs.metadata.checkpoint (last completed phase + phase data), structured log entries with phase/error context, per-phase checkpoint enables resume from last successful phase\nRedaction constraints: never log private keys or wallet seed phrases — only log public addresses and tx hashes",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M003",
+      "id": "S02",
+      "title": "Distribution Engine",
+      "status": "pending",
+      "risk": "medium",
+      "depends": [],
+      "demo": "CLI script distributes USDC (or SOL) to N wallets with proportional shares. Each transfer is verified on-chain. Failed transfers are retried and re-verified. Distribution report shows wallet → amount → txHash → verified status.",
+      "created_at": "2026-04-07T20:11:12.940Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Build the batched SPL token distribution system with per-transfer on-chain verification, owner/holder share calculation, and optional USDC→SOL swap. Ship a self-contained distribution module usable independently of the pipeline.",
+      "success_criteria": "- Proportional share calculation correctly splits total by holder BPS + owner BPS\\n- Batched SPL token transfers (~25 per versioned tx) execute successfully\\n- Per-transfer on-chain balance verification loop (D015)\\n- ATA creation for holders without existing token accounts\\n- USDC→SOL swap via Jupiter when distribution currency is SOL (R015)\\n- Checkpoint tracking for partial failure recovery\\n- Unit tests for share calculation, batch building, and verification logic",
+      "proof_level": "live — CLI script distributes real tokens to test wallets on Solana mainnet or devnet",
+      "integration_closure": "Provides: distributeToHolders(), calculateShares() consumed by S03's inbound pipeline. Requires: holder list (from M001 resolve module) + USDC/SOL amount.",
+      "observability_impact": "Structured logging (module: distribution) per batch with transfer count, success/fail counts. Distribution result persisted with per-holder breakdown.",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M003",
+      "id": "S03",
+      "title": "Auto-Divestment & Inbound Pipeline",
+      "status": "pending",
+      "risk": "medium",
+      "depends": [
+        "S01",
+        "S02"
+      ],
+      "demo": "Trigger divestment for a fund (via API or scheduler). The full inbound pipeline executes: holder snapshot locked → BSKT redeemed → ETH→USDC → bridged to Solana → holders receive distribution. All steps logged and checkpointed.",
+      "created_at": "2026-04-07T20:11:12.940Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Wire the redemption, bridge, and distribution modules into a single automated inbound pipeline triggered by divestment evaluation. Ship the divestment scheduler worker and full return pipeline orchestrator with checkpoint recovery.",
+      "success_criteria": "- Divestment trigger evaluation (time, threshold, both) correctly identifies funds due for divestment\\n- Holder snapshot locked at trigger time, not distribution time (D014)\\n- Full inbound pipeline orchestrator: redeem → swap → bridge → distribute with checkpoint recovery (D013)\\n- Minimum divestment threshold skip when TVL too low (D016)\\n- BullMQ divestment worker follows accumulation-worker pattern (concurrency:1, per-fund error isolation)\\n- REST API endpoint for manual divestment trigger\\n- Unit tests for trigger evaluation, pipeline orchestration, and checkpoint resume",
+      "proof_level": "live — single fund's full return pipeline executes end-to-end from trigger to distribution",
+      "integration_closure": "Provides: runInboundPipeline(), divestment-worker, manual divestment API endpoint. Consumes S01 and S02 modules. Consumed by S04's Fund Engine.",
+      "observability_impact": "Pipeline run tracked in pipelineRuns table with direction='inbound'. Per-phase checkpoint metadata. Divestment trigger evaluation logged per fund per scan.",
+      "sequence": 0,
+      "replan_triggered_at": null
+    },
+    {
+      "milestone_id": "M003",
+      "id": "S04",
+      "title": "Fund Engine & Multi-Fund Proof",
+      "status": "pending",
+      "risk": "low",
+      "depends": [
+        "S03"
+      ],
+      "demo": "3+ funds run simultaneously. Each completes a full cycle: accumulate → invest → divest → distribute → restart accumulation. Funds operate with independent pipelines and isolated failure domains. At least one fund completes 2+ full cycles.",
+      "created_at": "2026-04-07T20:11:12.940Z",
+      "completed_at": null,
+      "full_summary_md": "",
+      "full_uat_md": "",
+      "goal": "Extend the fund state machine for repeating cycles, build the Fund Engine for multi-fund lifecycle orchestration, and prove 3-5 funds running concurrent autonomous cycles.",
+      "success_criteria": "- State machine extended: completed→active transition for repeating cycles (D010)\\n- Fund Engine orchestrates lifecycle transitions across N concurrent funds\\n- Per-fund error isolation: one fund's failure doesn't affect others\\n- Serialized EVM operations or per-fund wallet isolation prevents balance interference\\n- 3-5 funds run concurrently through at least one full cycle\\n- At least one fund completes 2+ full round-trip cycles\\n- Full integration test proving autonomous operation\\n- Unit tests for state machine transitions and engine orchestration",
+      "proof_level": "integration — multi-fund concurrent execution with real pipeline invocations",
+      "integration_closure": "Consumes S03's inbound pipeline + M002's outbound pipeline. Provides: complete autonomous fund lifecycle. No downstream consumers in M003.",
+      "observability_impact": "Fund Engine logs lifecycle transitions per fund. Concurrent execution metrics (active pipelines, queue depth). Per-fund status queryable via API.",
       "sequence": 0,
       "replan_triggered_at": null
     }
@@ -1941,6 +2079,146 @@
       "observability_impact": "",
       "full_plan_md": "",
       "sequence": 0
+    },
+    {
+      "milestone_id": "M003",
+      "slice_id": "S01",
+      "id": "T01",
+      "title": "Built redeemBSKTForETH() and swapEthToUsdc() with structured logging and 24 passing tests",
+      "status": "complete",
+      "one_liner": "Built redeemBSKTForETH() and swapEthToUsdc() with structured logging and 24 passing tests",
+      "narrative": "Created src/alvara/redeem.ts mirroring the contribute.ts pattern in reverse: resolves BSKTPair, reads LP balance, fetches backend-signed withdrawETH routes, estimates gas with 10% buffer, sends the withdrawETH transaction, verifies LP burned to 0, and computes ETH received via WithdrawnETHFromBSKT event parsing (with balance delta fallback). Added swapEthToUsdc() to src/evm/swap.ts for native ETH→USDC swaps via 1inch — no approval needed. Both modules use structured JSON logging. 24 tests cover happy paths, dry-run, error handling, event parsing, input validation, and API failures.",
+      "verification_result": "Ran `npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts` — 24/24 tests passed. Ran `npx tsc --noEmit` — zero errors in production source files (src/alvara/redeem.ts, src/evm/swap.ts).",
+      "duration": "",
+      "completed_at": "2026-04-07T20:25:40.934Z",
+      "blocker_discovered": false,
+      "deviations": "Used separate fetch1inchSwapEthToUsdc() instead of generalizing existing helper. Event topic hash computed via viem keccak256 rather than hand-crafted.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/alvara/redeem.ts",
+        "src/evm/swap.ts",
+        "tests/alvara-redeem.test.ts",
+        "tests/evm-swap-eth-to-usdc.test.ts"
+      ],
+      "key_decisions": [
+        "Prefer WithdrawnETHFromBSKT event amount over balance delta for ETH received, with balance delta as fallback",
+        "Created separate fetch1inchSwapEthToUsdc() instead of generalizing fetch1inchSwap() to avoid changing tested code paths"
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S01\nmilestone: M003\nkey_files:\n  - src/alvara/redeem.ts\n  - src/evm/swap.ts\n  - tests/alvara-redeem.test.ts\n  - tests/evm-swap-eth-to-usdc.test.ts\nkey_decisions:\n  - Prefer WithdrawnETHFromBSKT event amount over balance delta for ETH received, with balance delta as fallback\n  - Created separate fetch1inchSwapEthToUsdc() instead of generalizing fetch1inchSwap() to avoid changing tested code paths\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T20:25:40.933Z\nblocker_discovered: false\n---\n\n# T01: Built redeemBSKTForETH() and swapEthToUsdc() with structured logging and 24 passing tests\n\n**Built redeemBSKTForETH() and swapEthToUsdc() with structured logging and 24 passing tests**\n\n## What Happened\n\nCreated src/alvara/redeem.ts mirroring the contribute.ts pattern in reverse: resolves BSKTPair, reads LP balance, fetches backend-signed withdrawETH routes, estimates gas with 10% buffer, sends the withdrawETH transaction, verifies LP burned to 0, and computes ETH received via WithdrawnETHFromBSKT event parsing (with balance delta fallback). Added swapEthToUsdc() to src/evm/swap.ts for native ETH→USDC swaps via 1inch — no approval needed. Both modules use structured JSON logging. 24 tests cover happy paths, dry-run, error handling, event parsing, input validation, and API failures.\n\n## Verification\n\nRan `npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts` — 24/24 tests passed. Ran `npx tsc --noEmit` — zero errors in production source files (src/alvara/redeem.ts, src/evm/swap.ts).\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts` | 0 | ✅ pass | 13800ms |\n| 2 | `npx tsc --noEmit (src files only)` | 0 | ✅ pass | 37900ms |\n\n## Deviations\n\nUsed separate fetch1inchSwapEthToUsdc() instead of generalizing existing helper. Event topic hash computed via viem keccak256 rather than hand-crafted.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/alvara/redeem.ts`\n- `src/evm/swap.ts`\n- `tests/alvara-redeem.test.ts`\n- `tests/evm-swap-eth-to-usdc.test.ts`\n",
+      "description": "Create the two atomic EVM-side building blocks: (1) `src/alvara/redeem.ts` — orchestrates withdrawETH (get backend-signed routes → call withdrawETH on BSKT contract → verify LP burned → verify ETH received via balance delta), following the exact pattern from `src/alvara/contribute.ts` but reversed. (2) Add `swapEthToUsdc()` to `src/evm/swap.ts` — swaps native ETH to USDC via 1inch (reverse of existing `swapUsdcToEth`; simpler because native ETH needs no ERC-20 approval). Both modules include structured JSON logging matching the project's module/phase/action pattern.\n\n## Steps\n\n1. Read `src/alvara/contribute.ts` and `src/evm/swap.ts` to absorb the exact patterns (ABI loading, gas estimation with 10% buffer, structured logging, viem contract calls, LP balance before/after verification).\n2. Create `src/alvara/redeem.ts`:\n   - Export `redeemBSKTForETH(opts: RedeemOptions): Promise<RedeemResult>`\n   - RedeemOptions: publicClient, walletClient, bsktAddress, bsktPairAddress (optional — resolved from BSKT.bsktPair()), dryRun flag\n   - Flow: resolve BSKTPair address → read LP balance → call `getWithdrawETHRoutes()` with full LP balance as liquidity → estimate gas → (if not dry run) send withdrawETH tx → wait for receipt → verify LP balance dropped to 0 → compute ETH received from balance delta → parse WithdrawnETHFromBSKT event from receipt logs\n   - On receipt.status === 'reverted', throw with tx hash\n   - Structured logging: module='alvara-redeem', phases: resolve, routes, gas, tx, verify\n3. Add `swapEthToUsdc()` to `src/evm/swap.ts`:\n   - Export interface `SwapEthToUsdcOptions` (publicClient, walletClient, ethAmount: bigint, slippagePercent)\n   - Export interface `SwapEthToUsdcResult` (txHash, usdcReceived: bigint)\n   - Flow: read USDC balance before → fetch 1inch swap quote (src=NATIVE_ETH 0xEeee..., dst=USDC) → send swap tx with ETH as value → wait receipt → read USDC balance after → return delta\n   - No ERC-20 approval needed for native ETH\n   - Reuse existing `fetch1inchSwap` helper by generalizing it, or add a parallel `fetch1inchSwapReverse` that swaps src/dst\n4. Create `tests/alvara-redeem.test.ts`:\n   - Mock `src/alvara/api.ts` (getWithdrawETHRoutes), viem contract reads (bsktPair, LP balance, ETH balance), walletClient.writeContract, publicClient.waitForTransactionReceipt\n   - Test happy path: routes fetched → tx sent → LP burned → ETH received\n   - Test dry-run mode: routes fetched, gas estimated, no tx sent\n   - Test revert handling: receipt.status === 'reverted' throws\n   - Test LP balance verification warning (LP didn't decrease)\n5. Create `tests/evm-swap-eth-to-usdc.test.ts`:\n   - Mock 1inch API fetch, viem wallet/public client\n   - Test happy path: ETH→USDC swap executes, USDC delta returned\n   - Test zero amount rejection\n   - Test 1inch API error handling\n   - Test tx revert handling\n6. Run `npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts` and fix until green.\n7. Run `npx tsc --noEmit` to confirm no type errors.\n\n## Must-Haves\n\n- [ ] `redeemBSKTForETH()` calls getWithdrawETHRoutes with correct params (bsktAddress, full LP as liquidity, chainId, userAddress)\n- [ ] `redeemBSKTForETH()` verifies LP balance dropped after tx confirms\n- [ ] `redeemBSKTForETH()` parses WithdrawnETHFromBSKT event for ETH amount\n- [ ] `redeemBSKTForETH()` supports dry-run mode (estimate only, no tx)\n- [ ] `swapEthToUsdc()` swaps native ETH (0xEeee... address) to USDC via 1inch\n- [ ] `swapEthToUsdc()` needs no ERC-20 approval (native ETH)\n- [ ] Both functions use structured JSON logging matching existing project patterns\n- [ ] All tests pass with mocked dependencies\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Alvara API (getWithdrawETHRoutes) | AlvaraApiError thrown with code/endpoint | AlvaraApiError TIMEOUT | AlvaraApiError INVALID_RESPONSE (validated by validateSignedSwapData) |\n| 1inch Swap API | Error with HTTP status + body | Error with timeout message | Error with 'invalid response' + missing fields |\n| EVM RPC (gas estimation) | Error propagated with 'Gas estimation failed' context | viem timeout (15s default) | Error propagated |\n| EVM RPC (tx receipt) | Error propagated | 60s receipt timeout | N/A (viem handles) |\n\n## Negative Tests\n\n- Malformed inputs: zero ethAmount rejects, empty bsktAddress rejects\n- Error paths: withdrawETH tx reverts (receipt.status=reverted), API returns 500\n- Boundary conditions: LP balance doesn't decrease (warning logged, no throw)",
+      "estimate": "2h",
+      "files": [
+        "src/alvara/redeem.ts",
+        "src/evm/swap.ts",
+        "tests/alvara-redeem.test.ts",
+        "tests/evm-swap-eth-to-usdc.test.ts"
+      ],
+      "verify": "npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts && npx tsc --noEmit",
+      "inputs": [
+        "`src/alvara/contribute.ts` — pattern reference for the withdrawETH flow (same structure reversed)",
+        "`src/alvara/api.ts` — getWithdrawETHRoutes() used by redeem module",
+        "`src/alvara/types.ts` — WithdrawETHRoutesRequest/Response types",
+        "`src/alvara/bskt-pair.ts` — getLPBalance() for verification",
+        "`src/evm/swap.ts` — existing swapUsdcToEth() pattern to mirror for ETH→USDC",
+        "`src/config/chains.ts` — KNOWN_ADDRESSES.USDC for swap destination",
+        "`src/config/bskt-logic-abi.json` — withdrawETH ABI entry"
+      ],
+      "expected_output": [
+        "`src/alvara/redeem.ts` — redeemBSKTForETH() orchestration module",
+        "`src/evm/swap.ts` — swapEthToUsdc() added alongside existing swapUsdcToEth()",
+        "`tests/alvara-redeem.test.ts` — unit tests for redeem flow",
+        "`tests/evm-swap-eth-to-usdc.test.ts` — unit tests for ETH→USDC swap"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M003",
+      "slice_id": "S01",
+      "id": "T02",
+      "title": "Build EVM bridge submission helper and inbound pipeline orchestrator with tests",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Create (1) `src/debridge/evm-tx.ts` — submits EVM calldata from deBridge's create-tx response as an on-chain transaction via viem (ERC-20 USDC approval to DlnSource + walletClient.sendTransaction). (2) Extend `src/pipeline/types.ts` with inbound pipeline types. (3) Create `src/pipeline/inbound.ts` — 3-phase orchestrator (redeem → ETH→USDC swap → bridge to Solana) with checkpoint recovery following the exact outbound pipeline pattern.\n\n## Steps\n\n1. Read `src/debridge/solana-tx.ts` for the Solana-side bridge tx submission pattern, and `src/pipeline/outbound.ts` for checkpoint recovery, logging, and phase orchestration patterns.\n2. Create `src/debridge/evm-tx.ts`:\n   - Export `submitEvmBridgeTransaction(opts): Promise<{ txHash: string }>` \n   - Options: publicClient, walletClient, txData (from DeBridgeOrderResponse.tx — has .data, .to, .value), usdcAmount (for approval)\n   - Flow: check USDC allowance to tx.to (DlnSource) → approve if insufficient → send transaction (to: tx.to, data: tx.data, value: BigInt(tx.value)) → wait receipt → verify not reverted → return txHash\n   - Reuse the checkAllowance/approveUsdc pattern from `src/evm/swap.ts`\n3. Extend `src/pipeline/types.ts`:\n   - Add `InboundCheckpointPhaseData` interface (redeeming, swapping, bridging phases)\n   - Add `InboundPipelineOptions` interface (fundId, db, evmPublicClient, evmWalletClient, solanaRecipientAddress, bsktAddress, bsktPairAddress optional, pipelineRunId, resumeCheckpoint)\n   - Add `InboundPipelineResult` interface (pipelineRunId, txHashes: InboundTxHashes, amountRedeemed, amountSwapped, amountBridged, durationMs)\n   - Add `InboundTxHashes` interface (redeemTx, swapTx, bridgeSendTx, bridgeReceiveTx)\n4. Create `src/pipeline/inbound.ts`:\n   - Export `runInboundPipeline(opts: InboundPipelineOptions): Promise<InboundPipelineResult>`\n   - Phase 1 (redeeming): call redeemBSKTForETH → checkpoint with ETH received\n   - Phase 2 (swapping): call swapEthToUsdc with ETH from phase 1 → checkpoint with USDC amount\n   - Phase 3 (bridging): call createBridgeOrder (srcChainId=BASE, dstChainId=SOLANA, USDC→USDC) → submitEvmBridgeTransaction → waitForFulfillment → checkpoint\n   - Each phase: check if already in checkpoint → skip if completed → execute → write advisory checkpoint → update pipeline_runs phase\n   - On any error: persist to pipeline_runs.error, set status='failed', re-throw\n   - Export `resumeInboundPipeline()` following the outbound resume pattern\n   - Reuse parseCheckpoint from outbound.ts (or extract shared version)\n5. Create `tests/debridge-evm-tx.test.ts`:\n   - Mock viem publicClient.readContract (allowance), walletClient.sendTransaction, publicClient.waitForTransactionReceipt\n   - Test happy path: approval needed → approved → tx sent → confirmed\n   - Test approval skip: allowance already sufficient\n   - Test tx revert handling\n6. Create `tests/inbound-pipeline.test.ts`:\n   - Mock all subsystems: redeemBSKTForETH, swapEthToUsdc, createBridgeOrder, submitEvmBridgeTransaction, waitForFulfillment, DB functions\n   - Test happy path: all 3 phases complete, tx hashes collected, pipeline_runs updated\n   - Test checkpoint resume: skip completed phases, resume from last failure\n   - Test phase failure: error persisted to DB, status set to 'failed'\n   - Test fund validation: fund not found → error, wrong status → error\n7. Run tests and tsc --noEmit.\n\n## Must-Haves\n\n- [ ] `submitEvmBridgeTransaction()` handles ERC-20 USDC approval to DlnSource before submitting\n- [ ] `submitEvmBridgeTransaction()` sends tx with correct to/data/value from deBridge response\n- [ ] Inbound pipeline orchestrates 3 phases: redeem → swap → bridge\n- [ ] Each phase writes advisory checkpoint to pipeline_runs.metadata\n- [ ] Pipeline supports resume from any failed phase via checkpoint\n- [ ] Pipeline records transactions in DB (bskt_redeem, swap, bridge_send, bridge_receive operations)\n- [ ] Pipeline validates fund exists and has correct status before proceeding\n- [ ] All tests pass\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| redeemBSKTForETH | Error propagated, pipeline marked failed at 'redeeming' | 60s receipt timeout propagated | N/A (typed return) |\n| swapEthToUsdc | Error propagated, pipeline marked failed at 'swapping' | 1inch/receipt timeout propagated | Error with invalid response message |\n| createBridgeOrder | Error propagated, pipeline marked failed at 'bridging' | 15s DLN timeout | Error with missing tx.data |\n| submitEvmBridgeTransaction | Error propagated with tx context | 60s receipt timeout | N/A |\n| waitForFulfillment | Error after 60 attempts (5min), pipeline marked failed | Throws with attempt count | N/A |\n| DB (checkpoint write) | Advisory — logged but pipeline continues (K018) | Advisory | Advisory |",
+      "estimate": "2.5h",
+      "files": [
+        "src/debridge/evm-tx.ts",
+        "src/pipeline/types.ts",
+        "src/pipeline/inbound.ts",
+        "tests/debridge-evm-tx.test.ts",
+        "tests/inbound-pipeline.test.ts"
+      ],
+      "verify": "npx vitest run tests/debridge-evm-tx.test.ts tests/inbound-pipeline.test.ts && npx tsc --noEmit",
+      "inputs": [
+        "`src/alvara/redeem.ts` — redeemBSKTForETH() called in phase 1",
+        "`src/evm/swap.ts` — swapEthToUsdc() called in phase 2",
+        "`src/debridge/api.ts` — createBridgeOrder(), waitForFulfillment() called in phase 3",
+        "`src/debridge/solana-tx.ts` — pattern reference for bridge tx submission",
+        "`src/pipeline/outbound.ts` — checkpoint recovery pattern to replicate",
+        "`src/pipeline/types.ts` — existing types to extend with inbound variants",
+        "`src/db/fund-repository.ts` — createPipelineRun, updatePipelineRun, recordTransaction, getFundById, getFundWallets",
+        "`src/config/chains.ts` — KNOWN_ADDRESSES.USDC for bridge source token"
+      ],
+      "expected_output": [
+        "`src/debridge/evm-tx.ts` — submitEvmBridgeTransaction() helper",
+        "`src/pipeline/types.ts` — extended with InboundPipelineOptions, InboundPipelineResult, InboundTxHashes, InboundCheckpointPhaseData",
+        "`src/pipeline/inbound.ts` — runInboundPipeline() + resumeInboundPipeline() orchestrator",
+        "`tests/debridge-evm-tx.test.ts` — unit tests for EVM bridge submission",
+        "`tests/inbound-pipeline.test.ts` — integration tests for inbound pipeline"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M003",
+      "slice_id": "S01",
+      "id": "T03",
+      "title": "Build CLI redemption-bridge script with dry-run and verification output",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Create the CLI entrypoint `scripts/redeem-bridge.ts` that wires up real viem clients, DB connection, and calls the inbound pipeline to execute the full redemption→swap→bridge flow. Includes --dry-run mode for estimate-only execution. This is the demo artifact — it proves the whole slice works end-to-end.\n\n## Steps\n\n1. Read `scripts/` directory to find existing CLI script patterns (argument parsing, client setup, output formatting). Read `src/pipeline/inbound.ts` to understand the InboundPipelineOptions interface.\n2. Create `scripts/redeem-bridge.ts`:\n   - Parse CLI args: --fund-id (required), --bskt-address (optional — reads from DB if not provided), --dry-run flag, --chain (default: 'base')\n   - Load env: EVM_PRIVATE_KEY (for walletClient), database URL, ONEINCH_API_KEY\n   - Create viem publicClient + walletClient for Base (or Ethereum based on --chain)\n   - Read fund from DB, resolve BSKT address + BSKTPair address if not provided\n   - Read Solana recipient address from fund wallets (chain='solana')\n   - If --dry-run:\n     - Read LP balance and log current position value\n     - Call getWithdrawETHRoutes for estimate\n     - Call createBridgeOrder without recipient for bridge estimate\n     - Output: estimated ETH from redemption, estimated USDC after swap, estimated USDC after bridge fees, Solana recipient address\n   - If not --dry-run:\n     - Call runInboundPipeline with all options\n     - Output structured report: pipelineRunId, phase tx hashes, amounts at each stage, total duration\n   - Exit code 0 on success, 1 on failure\n   - Error handling: catch and log with structured JSON, exit 1\n3. Add `--help` output with usage examples.\n4. Verify the script compiles: `npx tsx scripts/redeem-bridge.ts --help`\n5. Run `npx tsc --noEmit` for full project type check.\n\n## Must-Haves\n\n- [ ] CLI accepts --fund-id, --bskt-address, --dry-run, --chain flags\n- [ ] --help shows usage with examples\n- [ ] --dry-run mode outputs estimates without sending transactions\n- [ ] Normal mode calls runInboundPipeline and outputs structured result\n- [ ] Error handling catches pipeline failures and exits with code 1\n- [ ] Never logs private keys or secrets — only public addresses and tx hashes",
+      "estimate": "1h",
+      "files": [
+        "scripts/redeem-bridge.ts"
+      ],
+      "verify": "npx tsx scripts/redeem-bridge.ts --help && npx tsc --noEmit",
+      "inputs": [
+        "`src/pipeline/inbound.ts` — runInboundPipeline() called for execution",
+        "`src/alvara/api.ts` — getWithdrawETHRoutes() called for dry-run estimate",
+        "`src/debridge/api.ts` — createBridgeOrder() called for dry-run bridge estimate",
+        "`src/alvara/bskt-pair.ts` — getLPBalance() for dry-run position readout",
+        "`src/config/chains.ts` — createBaseClient(), createEthereumClient() for viem setup",
+        "`src/db/connection.ts` — database connection setup",
+        "`src/db/fund-repository.ts` — getFundById(), getFundWallets()"
+      ],
+      "expected_output": [
+        "`scripts/redeem-bridge.ts` — CLI script for manual redemption + bridge execution"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
     }
   ],
   "decisions": [
@@ -2373,6 +2651,54 @@
       "choice": "Persist emergency snapshots in pipeline_runs.metadata JSONB field — no new table or schema migration",
       "rationale": "The pipeline_runs table already has a JSONB metadata field used for checkpoint persistence (S02). Storing emergency snapshots there (with type: 'emergency_snapshot' discriminator) avoids a schema migration and follows the established pattern. The POST /emergency/revert endpoint reads the latest snapshot from DB, with a fallback to request body for manual overrides. Keeps the approach consistent with S03's forward intelligence noting that S05 would add DB persistence.",
       "revisable": "Yes — if snapshot queries become complex, a dedicated table may be warranted",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 37,
+      "id": "D037",
+      "when_context": "M003",
+      "scope": "architecture",
+      "decision": "Alvara redemption path for divestment",
+      "choice": "Use withdrawETH() with backend-signed routes via getWithdrawETHRoutes() API, not withdraw() + N separate swaps",
+      "rationale": "getWithdrawETHRoutes() is already implemented in src/alvara/api.ts and returns clean ETH output that feeds directly into ETH→USDC→bridge. The withdraw() alternative returns N constituent ERC-20 tokens requiring N separate swap operations — more gas, more complexity, more failure surface. withdrawETH() is the proven pattern from Alvara's own frontend.",
+      "revisable": "Yes — if Alvara backend rejects withdrawETH route requests, fall back to withdraw() + per-token swaps",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 38,
+      "id": "D038",
+      "when_context": "M003/S01",
+      "scope": "architecture",
+      "decision": "EVM→Solana bridge submission for return direction",
+      "choice": "Submit EVM calldata via viem walletClient (new submitEvmBridgeTransaction helper), reuse existing createBridgeOrder/getOrderStatus/waitForFulfillment for order lifecycle",
+      "rationale": "deBridge API is bidirectional — same endpoints, just different chain IDs. The only difference is tx submission: outbound uses Solana hex tx, return uses EVM calldata. A thin submitEvmBridgeTransaction() helper wraps the ERC-20 approval + walletClient.sendTransaction pattern already proven in evm/swap.ts.",
+      "revisable": "No",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 39,
+      "id": "D039",
+      "when_context": "M003/S02",
+      "scope": "architecture",
+      "decision": "Distribution batching strategy for Solana",
+      "choice": "~25 SPL token transfers per versioned transaction (4 txs minimum for 100 holders), with per-transfer on-chain balance verification loop and checkpoint tracking per batch",
+      "rationale": "Solana versioned tx size limit (~1232 bytes) with per-recipient ATA in account keys (~32 bytes each) caps practical transfers at 25-30 per tx. Per-transfer verification (D015) adds latency but ensures completeness — critical for user trust. Checkpointing per batch enables resume from partial failure without re-sending completed batches.",
+      "revisable": "Yes — batch size tunable based on ATA creation overhead",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 40,
+      "id": "D040",
+      "when_context": "M003/S01",
+      "scope": "architecture",
+      "decision": "Inbound pipeline phase structure for return direction",
+      "choice": "3-phase pipeline: redeem→swap(ETH→USDC)→bridge(EVM→Solana), with advisory checkpoint recovery matching outbound pipeline pattern",
+      "rationale": "The outbound pipeline has a proven 5-phase checkpoint pattern (K018). The inbound direction has 3 natural phases with clear boundaries. Advisory checkpoints (log but don't block on DB write failure) match the established resilience pattern. Distribution is deliberately excluded — it belongs to S02 as a separate subsystem.",
+      "revisable": "Yes",
       "made_by": "agent",
       "superseded_by": null
     }
@@ -3213,6 +3539,28 @@
       "verdict": "✅ pass",
       "duration_ms": 11200,
       "created_at": "2026-04-07T19:51:41.140Z"
+    },
+    {
+      "id": 77,
+      "task_id": "T01",
+      "slice_id": "S01",
+      "milestone_id": "M003",
+      "command": "npx vitest run tests/alvara-redeem.test.ts tests/evm-swap-eth-to-usdc.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 13800,
+      "created_at": "2026-04-07T20:25:40.934Z"
+    },
+    {
+      "id": 78,
+      "task_id": "T01",
+      "slice_id": "S01",
+      "milestone_id": "M003",
+      "command": "npx tsc --noEmit (src files only)",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 37900,
+      "created_at": "2026-04-07T20:25:40.934Z"
     }
   ]
 }

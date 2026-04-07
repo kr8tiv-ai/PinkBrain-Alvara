@@ -98,7 +98,7 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Fund auto-liquidates based on configured triggers: time-based schedule, value threshold, or both. Locked at setup.
 - Why it matters: Automation is the whole point — the fund must divest without manual intervention
 - Source: user
-- Primary owning slice: M003/S01
+- Primary owning slice: M003/S03
 - Supporting slices: M001/S05
 - Validation: unmapped
 - Notes: Time-based: monthly, quarterly, etc. Value-based: total basket TVL hits target. Both: whichever triggers first.
@@ -120,8 +120,8 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Bridge liquidation proceeds (USDC/ETH) from Base/Ethereum back to Solana via deBridge DLN
 - Why it matters: Proceeds must return to Solana for distribution to holders
 - Source: user
-- Primary owning slice: M003/S02
-- Supporting slices: none
+- Primary owning slice: M003/S01
+- Supporting slices: M003/S03
 - Validation: unmapped
 - Notes: ETH → USDC swap on EVM side first (via 1inch or Alvara's swap), then bridge USDC to Solana.
 
@@ -142,8 +142,8 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Distribute divestment proceeds to up to 100 wallets on Solana via batched SPL token transfers with checkpoint recovery
 - Why it matters: Distribution is the end of the pipeline — must be reliable and atomic-ish
 - Source: user
-- Primary owning slice: M003/S03
-- Supporting slices: none
+- Primary owning slice: M003/S02
+- Supporting slices: M003/S03
 - Validation: unmapped
 - Notes: ~30 instructions per Solana versioned transaction → 4 transactions minimum for 100 holders. Checkpoint tracking for partial failure recovery.
 
@@ -153,7 +153,7 @@ This file is the explicit capability and coverage contract for the project.
 - Description: Fund creator chooses at setup whether holders receive USDC or SOL. Choice locked at creation.
 - Why it matters: Some holders prefer stable value, some prefer native token
 - Source: user
-- Primary owning slice: M003/S03
+- Primary owning slice: M003/S02
 - Supporting slices: M001/S05
 - Validation: unmapped
 - Notes: If SOL chosen, add a Jupiter USDC→SOL swap before distribution.
@@ -210,7 +210,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: inferred
 - Primary owning slice: M003/S04
 - Supporting slices: M001/S05, M002/S02
-- Validation: unmapped
+- Validation: M002/S02: Scheduler iterates over all active funds with per-fund error isolation — one fund's failure doesn't block others. updateFundLastPipelineRun tracks per-fund scheduling state. Concurrency guard (getActivePipelineRuns) prevents double dispatch. 9 scheduler tests verify skip and isolation conditions. Full multi-fund stress test deferred to M003.
 - Notes: BullMQ for job scheduling. Each fund has its own state machine instance. Failures in one fund don't affect others.
 
 ### R021 — Fund creator chooses at setup whether their Alvara basket is deployed on Base or Ethereum mainnet
@@ -221,7 +221,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M002/S01
 - Supporting slices: M001/S01, M002/S04
-- Validation: unmapped
+- Validation: M002/S01+S04: Base chain config (viem chain, RPC URLs, Blockscout explorer) established in M001. Ethereum mainnet config (createEthereumClient, ETH_RPCS array) added in S04 via chains.ts. Both chains available via configurable chain parameter.
 - Notes: Alvara launched on Base April 2, 2026. Both chains fully supported. deBridge supports both.
 
 ### R022 — The app's frontend is embedded within the Bags.fm app store, not a standalone site
@@ -254,7 +254,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: inferred
 - Primary owning slice: M002/S03
 - Supporting slices: M002/S01, M002/S05
-- Validation: unmapped
+- Validation: M002/S03+S05: emergencyStables() converts basket to ~95% USDT + 5% ALVA via rebalance() (D031). emergencyRevert() restores original composition from snapshot. REST endpoints (POST /funds/:id/emergency, POST /funds/:id/emergency/revert) with DB-backed snapshot persistence. 16 emergency unit tests + 11 API tests. Live BSKT not yet exercised.
 - Notes: No dedicated emergencyStables function on BSKT contract. Implemented as rebalance() with target weights ~95% USDT + 5% ALVA (D031). Emergency revert is another rebalance back to original weights.
 
 ### R025 — Bridge operations implement automatic retry with exponential backoff, status monitoring, and manual intervention alerts
@@ -375,21 +375,21 @@ This file is the explicit capability and coverage contract for the project.
 | R007 | core-capability | active | M001/S01 | M002/S02 | S01/T02: Factory interface proven (createBSKT signature, full ABI). MEV analysis of 5 on-chain txs confirms backend-signed swap routes required — direct creation without Alvara's signing API will revert with InvalidSignature. Integration path documented in mev-findings.json. Capability achievable but requires Alvara backend API integration, not just direct contract calls. |
 | R008 | core-capability | active | M002/S03 | M002/S01 | M002/S03: rebalanceBSKT() orchestration — ownership check, backend-signed routes via getRebalanceRoutes(), gas estimate, tx with BSKTRebalanced event parsing, LP verification. CLI script with --new-tokens/--new-weights/--mode/--dry-run. 14 unit tests. Live BSKT rebalance not yet exercised. |
 | R009 | core-capability | active | M002/S04 | M001/S05, M002/S05 | M002/S04: DivestmentRegistry.sol with immutable one-shot registration, custom errors (AlreadyRegistered, InvalidSplitBps), 12 Forge tests. TypeScript client with registerConfig/getConfig. Integration test on Anvil proves full lifecycle: deploy → register → read from different wallet → overwrite reverts. Gas: 161k (well under 500k). Not yet deployed to Base/Ethereum mainnet. |
-| R010 | primary-user-loop | active | M003/S01 | M001/S05 | unmapped |
+| R010 | primary-user-loop | active | M003/S03 | M001/S05 | unmapped |
 | R011 | core-capability | active | M003/S01 | none | unmapped |
-| R012 | core-capability | active | M003/S02 | none | unmapped |
+| R012 | core-capability | active | M003/S01 | M003/S03 | unmapped |
 | R013 | core-capability | active | M001/S04 | M003/S02 | M001/S04: Dual-strategy holder resolution — getProgramAccounts with SPL Token filters + Helius DAS auto-fallback. Integer bigint math for percentages. 40 unit tests. CLI proof script. |
-| R014 | core-capability | active | M003/S03 | none | unmapped |
-| R015 | core-capability | active | M003/S03 | M001/S05 | unmapped |
+| R014 | core-capability | active | M003/S02 | M003/S03 | unmapped |
+| R015 | core-capability | active | M003/S02 | M001/S05 | unmapped |
 | R016 | core-capability | active | M001/S06 | M002/S02 | M001/S05+S06: protocolFeeBps field on funds table. Protocol fee deduction as raw SPL Token USDC transfer in outbound pipeline (after swap, before bridge). Tested with 0/500/1000 bps values. |
 | R017 | constraint | active | M001/S05 | M003/S01 | M001/S05: Divestment config immutability enforced via upsert pattern — update if unlocked, throw ConfigLocked error if lockedAt is set. Integration tests cover lock/reject flow. |
 | R018 | quality-attribute | active | M004/S03 | all | unmapped |
 | R019 | quality-attribute | active | M003/S04 | all | unmapped |
-| R020 | core-capability | active | M003/S04 | M001/S05, M002/S02 | unmapped |
-| R021 | core-capability | active | M002/S01 | M001/S01, M002/S04 | unmapped |
+| R020 | core-capability | active | M003/S04 | M001/S05, M002/S02 | M002/S02: Scheduler iterates over all active funds with per-fund error isolation — one fund's failure doesn't block others. updateFundLastPipelineRun tracks per-fund scheduling state. Concurrency guard (getActivePipelineRuns) prevents double dispatch. 9 scheduler tests verify skip and isolation conditions. Full multi-fund stress test deferred to M003. |
+| R021 | core-capability | active | M002/S01 | M001/S01, M002/S04 | M002/S01+S04: Base chain config (viem chain, RPC URLs, Blockscout explorer) established in M001. Ethereum mainnet config (createEthereumClient, ETH_RPCS array) added in S04 via chains.ts. Both chains available via configurable chain parameter. |
 | R022 | launchability | active | M004/S01 | none | unmapped |
 | R023 | failure-visibility | active | M004/S02 | none | unmapped |
-| R024 | continuity | active | M002/S03 | M002/S01, M002/S05 | unmapped |
+| R024 | continuity | active | M002/S03 | M002/S01, M002/S05 | M002/S03+S05: emergencyStables() converts basket to ~95% USDT + 5% ALVA via rebalance() (D031). emergencyRevert() restores original composition from snapshot. REST endpoints (POST /funds/:id/emergency, POST /funds/:id/emergency/revert) with DB-backed snapshot persistence. 16 emergency unit tests + 11 API tests. Live BSKT not yet exercised. |
 | R025 | continuity | active | M003/S02 | M001/S02 | unmapped |
 | R026 | quality-attribute | active | M003/S04 | M001/S05 | unmapped |
 | R027 | quality-attribute | active | M004/S03 | all | unmapped |

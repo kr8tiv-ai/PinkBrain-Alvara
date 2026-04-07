@@ -1,8 +1,8 @@
 /**
- * USDC → ETH swap on Base via 1inch Swap API (v6.0).
+ * Token swaps on Base via 1inch Swap API (v6.0).
  *
- * Handles ERC-20 approval check + approve if needed, then fetches optimal
- * swap calldata from 1inch and executes the transaction on-chain.
+ * USDC → ETH: Handles ERC-20 approval + 1inch swap.
+ * ETH → USDC: Native ETH swap (no approval needed).
  *
  * See: K005 (Alvara uses 1inch router for DEX swaps)
  */
@@ -277,4 +277,185 @@ export async function swapUsdcToEth(opts: SwapUsdcToEthOptions): Promise<SwapUsd
   });
 
   return { txHash, ethReceived };
+}
+
+// ── ETH → USDC Swap ────────────────────────────────────────────────────
+
+export interface SwapEthToUsdcOptions {
+  /** Viem public client for Base reads */
+  publicClient: AnyPublicClient;
+  /** Viem wallet client for Base signing/sending */
+  walletClient: AnyWalletClient;
+  /** ETH amount to swap (in wei) */
+  ethAmount: bigint;
+  /** Slippage tolerance in percent (default: 1) */
+  slippagePercent?: number;
+}
+
+export interface SwapEthToUsdcResult {
+  /** Transaction hash of the swap */
+  txHash: Hash;
+  /** USDC received (atomic units — 6 decimals) */
+  usdcReceived: bigint;
+}
+
+/**
+ * Fetch 1inch swap calldata for ETH → USDC.
+ * No ERC-20 approval needed — native ETH is sent as tx value.
+ */
+async function fetch1inchSwapEthToUsdc(
+  fromAddress: Address,
+  ethAmount: bigint,
+  slippagePercent: number,
+): Promise<OneInchSwapResponse> {
+  const params = new URLSearchParams({
+    src: NATIVE_ETH,
+    dst: KNOWN_ADDRESSES.USDC,
+    amount: ethAmount.toString(),
+    from: fromAddress,
+    slippage: slippagePercent.toString(),
+    disableEstimate: 'false',
+    allowPartialFill: 'false',
+  });
+
+  const url = `${ONEINCH_API_BASE}/swap?${params}`;
+  log('eth_to_usdc_api_request', { url: url.replace(/from=[^&]+/, 'from=REDACTED') });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.ONEINCH_API_KEY ?? ''}`,
+        'Accept': 'application/json',
+      },
+      signal: controller.signal,
+    });
+  } catch (err: unknown) {
+    clearTimeout(timeout);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('abort')) {
+      throw new Error(`1inch Swap API timeout after ${API_TIMEOUT_MS}ms`);
+    }
+    throw new Error(`1inch Swap API request failed: ${msg}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    let errorBody = '';
+    try {
+      errorBody = await response.text();
+    } catch { /* ignore */ }
+    throw new Error(
+      `1inch Swap API error ${response.status}: ${errorBody.slice(0, 500)}`,
+    );
+  }
+
+  const data = await response.json() as Record<string, unknown>;
+
+  // Validate response shape
+  const tx = data.tx as Record<string, unknown> | undefined;
+  if (!tx || typeof tx.data !== 'string' || typeof tx.to !== 'string') {
+    throw new Error(
+      `1inch Swap API returned invalid response: missing tx.data or tx.to — got keys: ${Object.keys(data).join(', ')}`,
+    );
+  }
+
+  if (typeof data.toAmount !== 'string') {
+    throw new Error(
+      `1inch Swap API returned invalid response: missing toAmount — got keys: ${Object.keys(data).join(', ')}`,
+    );
+  }
+
+  log('eth_to_usdc_api_response', {
+    toAmount: data.toAmount,
+    gasEstimate: tx.gas,
+  });
+
+  return data as unknown as OneInchSwapResponse;
+}
+
+/**
+ * Swap native ETH → USDC on Base via 1inch.
+ *
+ * No ERC-20 approval needed — native ETH is sent directly as tx value.
+ *
+ * 1. Read USDC balance before.
+ * 2. Fetch swap calldata from 1inch Swap API (src=ETH, dst=USDC).
+ * 3. Send the swap transaction with ETH as value.
+ * 4. Wait for confirmation, compute USDC received from balance delta.
+ *
+ * @throws on API failure, timeout, or tx revert.
+ */
+export async function swapEthToUsdc(opts: SwapEthToUsdcOptions): Promise<SwapEthToUsdcResult> {
+  const { publicClient, walletClient, ethAmount, slippagePercent = 1 } = opts;
+  const account = walletClient.account!.address as Address;
+
+  if (ethAmount <= 0n) {
+    throw new Error('swapEthToUsdc: ethAmount must be > 0');
+  }
+
+  log('eth_to_usdc_start', { account, ethAmount: String(ethAmount), slippagePercent });
+
+  // 1. Read USDC balance before swap
+  const usdcBefore = (await publicClient.readContract({
+    address: KNOWN_ADDRESSES.USDC,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [account],
+  })) as bigint;
+
+  log('eth_to_usdc_balance_before', { usdcBefore: String(usdcBefore) });
+
+  // 2. Fetch swap calldata from 1inch
+  const swapResponse = await fetch1inchSwapEthToUsdc(account, ethAmount, slippagePercent);
+
+  // 3. Send the swap transaction — ETH sent as value
+  const txHash = await walletClient.sendTransaction({
+    to: swapResponse.tx.to as Address,
+    data: swapResponse.tx.data as `0x${string}`,
+    value: BigInt(swapResponse.tx.value),
+    gas: BigInt(swapResponse.tx.gas) + BigInt(swapResponse.tx.gas) / 10n, // 10% buffer
+    chain: walletClient.chain,
+    account: walletClient.account!,
+  });
+
+  log('eth_to_usdc_tx_sent', { txHash });
+
+  // 4. Wait for confirmation
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: txHash,
+    timeout: 60_000,
+  });
+
+  if (receipt.status === 'reverted') {
+    throw new Error(`ETH→USDC swap transaction reverted: ${txHash}`);
+  }
+
+  log('eth_to_usdc_tx_confirmed', {
+    txHash,
+    gasUsed: String(receipt.gasUsed),
+    blockNumber: String(receipt.blockNumber),
+  });
+
+  // 5. Compute USDC received from balance delta
+  const usdcAfter = (await publicClient.readContract({
+    address: KNOWN_ADDRESSES.USDC,
+    abi: erc20Abi,
+    functionName: 'balanceOf',
+    args: [account],
+  })) as bigint;
+
+  const usdcReceived = usdcAfter - usdcBefore;
+
+  log('eth_to_usdc_complete', {
+    txHash,
+    usdcReceived: String(usdcReceived),
+    expectedAmount: swapResponse.toAmount,
+  });
+
+  return { txHash, usdcReceived };
 }
