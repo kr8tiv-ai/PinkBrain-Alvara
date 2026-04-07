@@ -36,6 +36,8 @@ export interface PipelineTxHashes {
   feeTransfer: string | null;
   bridgeSend: string | null;
   bridgeReceive: string | null;
+  /** BSKT contribute() transaction hash on Base (null if not yet invested) */
+  investTxHash: string | null;
 }
 
 /** Result returned on successful pipeline completion. */
@@ -54,6 +56,8 @@ export interface OutboundPipelineResult {
   amountBridged: string;
   /** deBridge order ID for fulfillment tracking */
   bridgeOrderId: string;
+  /** ETH amount invested into the BSKT via contribute() (wei as string, empty if not yet invested) */
+  amountInvested: string;
   /** Wall-clock duration of the entire pipeline run (ms) */
   durationMs: number;
 }
