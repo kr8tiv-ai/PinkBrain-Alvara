@@ -1,0 +1,161 @@
+[
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [
+      {
+        "name": "fundId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "config",
+        "type": "tuple",
+        "internalType": "struct DivestmentRegistry.DivestmentConfig",
+        "components": [
+          {
+            "name": "holderSplitBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "ownerSplitBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "triggerType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "triggerParams",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "distributionCurrency",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "registeredAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registerConfig",
+    "inputs": [
+      {
+        "name": "fundId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "holderSplitBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "ownerSplitBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "triggerType",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "triggerParams",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "distributionCurrency",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "registered",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "ConfigRegistered",
+    "inputs": [
+      {
+        "name": "fundId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AlreadyRegistered",
+    "inputs": [
+      {
+        "name": "fundId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidSplitBps",
+    "inputs": [
+      {
+        "name": "holderSplitBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "ownerSplitBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ]
+  }
+]

@@ -22,18 +22,16 @@ All six critical subsystems proven independently and the outbound pipeline wired
 |---|---|---|
 | S01: Alvara Backend API & BSKT Investment | ✅ Complete | Typed API client (4 endpoints), contribute orchestration, CLI with dry-run, 50 tests. |
 | S02: Accumulation Scheduler & Automated Pipeline | ✅ Complete | BullMQ scheduler, 5-phase pipeline (claim→swap→fee→bridge→invest), checkpoint crash recovery, 57 new tests (250 total). |
-| S03: Rebalancing & Emergency Controls | ⬜ Next | Rebalance + emergency stables using S01's API client |
-| S04: On-Chain Divestment Config Registry | ⬜ Pending | Solidity contract + TypeScript client |
+| S03: Rebalancing & Emergency Controls | ✅ Complete | rebalanceBSKT() orchestration, emergencyStables()/emergencyRevert() with snapshot state, 2 CLI scripts, 30 new tests (80 across Alvara modules). |
+| S04: On-Chain Divestment Config Registry | ⬜ Next | Solidity contract + TypeScript client |
 | S05: REST API & Fund Management | ⬜ Pending | Fastify REST API wiring all subsystems |
 
-**S02 Delivered:**
-- `src/scheduler/` — BullMQ-based accumulation scheduler: Redis connection singleton, queue factory, Worker that polls active funds on cron (default every 6 hours), checks SOL balance against configurable threshold, enforces concurrency guard, dispatches pipeline
-- `src/evm/swap.ts` — USDC→ETH swap via 1inch Swap API v6.0 on Base (allowance check, approve, fetch calldata, send, confirm)
-- Pipeline phase 5 (investing): swaps bridged USDC to ETH, contributes ETH to Alvara BSKT via S01's contributeToBSKT
-- Checkpoint persistence for all 5 pipeline phases with advisory writes and resumeOutboundPipeline() for crash recovery
-- `scripts/start-scheduler.ts` — CLI entry point with --cron flag, graceful shutdown
-- DB schema: accumulationThresholdLamports, lastPipelineRunAt on funds; bskt_contribute operation enum
-- Docker: Redis 7 Alpine service with health check
+**S03 Delivered:**
+- `src/alvara/rebalance.ts` — rebalanceBSKT() orchestration: ownership check → backend-signed routes → gas estimate → tx → BSKTRebalanced event parsing → LP verification. RebalanceMode enum (STANDARD, EMERGENCY_STABLES, REVERT_EMERGENCY). Dry-run support.
+- `src/alvara/emergency.ts` — emergencyStables() snapshots composition then rebalances to 95% USDT + 5% ALVA. emergencyRevert() restores from snapshot. Both wrap rebalanceBSKT().
+- `scripts/rebalance-bskt.ts` — CLI for manual rebalance with arg validation (weights sum, token/weight count match)
+- `scripts/emergency-stables.ts` — CLI for emergency conversion with snapshot file I/O for revert
+- USDT added to KNOWN_ADDRESSES in chains.ts
 
 ## Architecture / Key Patterns
 
@@ -62,7 +60,7 @@ All six critical subsystems proven independently and the outbound pipeline wired
 - Distribution to top 100 holders by token balance (not a separate staking contract)
 - Alvara backend API base URL not yet confirmed — defaults to https://api.alvara.xyz, configurable via ALVARA_API_URL
 
-**Established patterns (M001 + M002/S01-S02):**
+**Established patterns (M001 + M002/S01-S03):**
 - Blockscout free API for Base chain (Etherscan V2 optional fallback with paid key)
 - EIP-1967 proxy detection for Alvara contract resolution
 - Beacon proxy ABI resolution — factory.*Implementation() → beacon.implementation() → Blockscout verified ABI
@@ -70,6 +68,8 @@ All six critical subsystems proven independently and the outbound pipeline wired
 - Thin REST API clients with typed inputs/outputs, runtime response validation (deBridge + Jupiter + Alvara + 1inch patterns)
 - SDK wrapper with mock injection — functions accept SDK instance, not raw API key (Bags pattern)
 - EVM contribute orchestration — resolve pair → read LP → fetch routes → gas → tx → confirm → verify LP
+- Rebalance orchestration — ownership check → API routes → gas estimate → tx → event parse → LP verify
+- Emergency wrapper pattern — snapshot composition → rebalance to fixed target → return snapshot for revert
 - Dual-mode CLI scripts: safe estimate/dry-run vs full execution
 - vitest with fetch mocking and SDK mock injection for unit tests
 - Integration tests skip gracefully when infrastructure unavailable (ctx.skip() pattern)
@@ -85,6 +85,6 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 ## Milestone Sequence
 
 - [x] M001: Risk Retirement & Subsystem Proof — COMPLETE ✅
-- [ ] M002: Outbound Pipeline (Solana → Alvara) — S01-S02 complete, S03-S05 remaining
+- [ ] M002: Outbound Pipeline (Solana → Alvara) — S01-S03 complete, S04-S05 remaining
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T19:08:08.216Z",
+  "exported_at": "2026-04-07T19:22:08.084Z",
   "milestones": [
     {
       "id": "M001",
@@ -293,14 +293,14 @@
       "milestone_id": "M002",
       "id": "S03",
       "title": "Rebalancing & Emergency Controls",
-      "status": "pending",
+      "status": "complete",
       "risk": "medium",
       "depends": [],
       "demo": "Run a CLI script that triggers a rebalance on a real BSKT — changes token weights, verifies BSKTRebalanced event emitted. Then trigger Emergency Stables — verify basket converts to ~95% USDT + 5% ALVA. Trigger revert — verify original composition restored.",
       "created_at": "2026-04-07T10:21:06.078Z",
-      "completed_at": null,
-      "full_summary_md": "",
-      "full_uat_md": "",
+      "completed_at": "2026-04-07T19:11:27.765Z",
+      "full_summary_md": "---\nid: S03\nparent: M002\nmilestone: M002\nprovides:\n  - rebalanceBSKT() orchestration function for programmatic basket rebalancing\n  - emergencyStables() and emergencyRevert() for circuit-breaker basket protection\n  - RebalanceMode enum (STANDARD, EMERGENCY_STABLES, REVERT_EMERGENCY)\n  - CLI scripts for manual rebalance and emergency operations\n  - USDT in KNOWN_ADDRESSES (chains.ts)\nrequires:\n  - slice: S01\n    provides: Alvara backend API client (getRebalanceRoutes), contribute.ts orchestration pattern, loadBSKTLogicABI()\naffects:\n  - S05\nkey_files:\n  - src/alvara/rebalance.ts\n  - src/alvara/emergency.ts\n  - scripts/rebalance-bskt.ts\n  - scripts/emergency-stables.ts\n  - tests/alvara-rebalance.test.ts\n  - tests/alvara-emergency.test.ts\n  - src/config/chains.ts\nkey_decisions:\n  - Owner check runs BEFORE any API call — fail fast on non-manager wallets (security)\n  - Emergency stables implemented as rebalance() with [9500, 500] bps target — no dedicated on-chain function (D031)\n  - BSKTRebalanced event not found is a warning, not an error — caller decides severity\n  - Snapshot uses string-encoded weights for bigint JSON safety in file I/O\n  - Emergency module wraps rebalanceBSKT() rather than duplicating transaction logic\npatterns_established:\n  - Rebalance orchestration pattern: ownership check → API routes → gas estimate → tx → event parse → LP verify\n  - Emergency wrapper pattern: snapshot composition → rebalance to fixed target → return snapshot for revert\n  - Snapshot-based state recovery: emergencyStables() outputs snapshot, emergencyRevert() consumes it\n  - CLI arg validation: weights sum check, token/weight count match, address format before any RPC call\nobservability_surfaces:\n  - Structured JSON logging with module: 'alvara-rebalance' and module: 'alvara-emergency' — grep-friendly for pipeline debugging\n  - CLI scripts output structured JSON to stdout for programmatic consumption, diagnostic logs to stderr\ndrill_down_paths:\n  - .gsd/milestones/M002/slices/S03/tasks/T01-SUMMARY.md\n  - .gsd/milestones/M002/slices/S03/tasks/T02-SUMMARY.md\n  - .gsd/milestones/M002/slices/S03/tasks/T03-SUMMARY.md\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-04-07T19:11:27.766Z\nblocker_discovered: false\n---\n\n# S03: Rebalancing & Emergency Controls\n\n**Delivered rebalanceBSKT() orchestration, emergencyStables()/emergencyRevert() with snapshot-based state, and two CLI scripts — 80 tests pass across all Alvara modules**\n\n## What Happened\n\nBuilt the rebalancing and emergency controls layer in three tasks, each following the established contribute.ts orchestration pattern.\n\nT01 created `src/alvara/rebalance.ts` (430 lines) — the core rebalanceBSKT() function that: reads current composition via getConstituents(), verifies wallet is BSKT owner (fails fast before any API/gas work), resolves BSKTPair + reads LP balance, fetches backend-signed routes via getRebalanceRoutes(), encodes calldata + estimates gas with 10% buffer, sends rebalance() tx, parses BSKTRebalanced event from receipt logs, and verifies LP wasn't destroyed. Exports RebalanceMode enum (STANDARD=0, EMERGENCY_STABLES=1, REVERT_EMERGENCY=2). Added USDT to KNOWN_ADDRESSES in chains.ts. 14 unit tests cover happy path, dry run, owner mismatch, API failure, gas estimation failure, tx revert, missing event, gas buffer, LP verification, and mode propagation.\n\nT02 created `src/alvara/emergency.ts` (294 lines) wrapping rebalanceBSKT() with emergency-specific logic. emergencyStables() reads current composition, snapshots it, computes emergency target [USDT, ALVA] at [9500, 500] bps, calls rebalanceBSKT with EMERGENCY_STABLES mode, validates the BSKTRebalanced event. emergencyRevert() accepts a snapshot, validates it, converts bigint weights to numbers, calls rebalanceBSKT with REVERT_EMERGENCY mode. Both support dry-run via the underlying rebalanceBSKT(). 16 unit tests.\n\nT03 created two CLI scripts following the contribute-bskt.ts pattern. `scripts/rebalance-bskt.ts` (259 lines) accepts --bskt-address, --new-tokens, --new-weights, --mode, --dry-run with full validation (address format, token/weight count match, weights sum to 10000). `scripts/emergency-stables.ts` (327 lines) supports default mode (convert to stables, output snapshot JSON) and --revert --snapshot-file mode (restore original composition from snapshot file). Both use structured JSON to stdout, diagnostic logs to stderr, PRIVATE_KEY validation, and ALVARA_API_URL env var override. Full 80-test suite passes with zero regressions.\n\n## Verification\n\nAll 80 tests pass across 4 test files: alvara-rebalance (14), alvara-emergency (16), alvara-contribute (13), alvara-api (37). Both CLI scripts produce clean --help output with correct usage documentation. No regressions in any existing test suite.\n\n## Requirements Advanced\n\n- R008 — rebalanceBSKT() orchestration with backend-signed routes, CLI script, 14 unit tests — programmatic rebalance capability delivered, awaits live BSKT proof\n- R024 — emergencyStables() + emergencyRevert() with snapshot state, CLI script, 16 unit tests — emergency circuit breaker delivered, awaits live BSKT proof\n\n## Requirements Validated\n\nNone.\n\n## New Requirements Surfaced\n\nNone.\n\n## Requirements Invalidated or Re-scoped\n\nNone.\n\n## Deviations\n\nUsed encodeEventTopics + encodeAbiParameters in tests instead of encodeEventLog — viem 2.47.10 doesn't export encodeEventLog. No functional impact.\n\n## Known Limitations\n\nNot live-tested against a real BSKT — all tests use mocked viem clients and API responses. Alvara backend rebalance route signing endpoint not yet confirmed (mocked based on the contribute route pattern). Snapshot state is in-memory/file-based — S05 will add database persistence for production use.\n\n## Follow-ups\n\nS05 needs to wire rebalanceBSKT(), emergencyStables(), and emergencyRevert() into REST endpoints with database-backed snapshot persistence. Live integration test against a real BSKT when a funded test wallet is available.\n\n## Files Created/Modified\n\n- `src/alvara/rebalance.ts` — rebalanceBSKT() orchestration — ownership check, backend-signed routes, BSKTRebalanced event parsing, dry-run, 430 lines\n- `src/alvara/emergency.ts` — emergencyStables() and emergencyRevert() wrapping rebalanceBSKT() with snapshot state, 294 lines\n- `scripts/rebalance-bskt.ts` — CLI for manual BSKT rebalance with arg validation and structured JSON output, 259 lines\n- `scripts/emergency-stables.ts` — CLI for emergency stables conversion and snapshot-based revert, 327 lines\n- `tests/alvara-rebalance.test.ts` — 14 unit tests for rebalanceBSKT() covering all paths\n- `tests/alvara-emergency.test.ts` — 16 unit tests for emergencyStables() and emergencyRevert()\n- `src/config/chains.ts` — Added USDT to KNOWN_ADDRESSES for Base chain\n",
+      "full_uat_md": "# S03: Rebalancing & Emergency Controls — UAT\n\n**Milestone:** M002\n**Written:** 2026-04-07T19:11:27.767Z\n\n# S03: Rebalancing & Emergency Controls — UAT\n\n**Milestone:** M002\n**Written:** 2026-04-07\n\n## UAT Type\n\n- UAT mode: artifact-driven\n- Why this mode is sufficient: Rebalance and emergency operations require a funded wallet + real BSKT ownership on Base mainnet. Unit tests mock the full call chain. CLI scripts validate arg parsing and wiring. Live proof deferred to integration testing when a test BSKT is available.\n\n## Preconditions\n\n- Node.js 18+ and npm installed\n- Project dependencies installed (`npm install`)\n- PRIVATE_KEY env var set to a 0x-prefixed 64-char hex private key (for CLI scripts — not needed for unit tests)\n- The wallet behind PRIVATE_KEY must own the target BSKT NFT (for live rebalance/emergency)\n- ALVARA_API_URL optionally set (defaults to https://api.alvara.xyz)\n\n## Smoke Test\n\n```bash\nnpx vitest run tests/alvara-rebalance.test.ts tests/alvara-emergency.test.ts\n```\nExpected: 30 tests pass (14 rebalance + 16 emergency), exit 0.\n\n## Test Cases\n\n### 1. Rebalance happy path (unit test)\n\n1. Run `npx vitest run tests/alvara-rebalance.test.ts -t \"happy path\"`\n2. **Expected:** Test passes — rebalanceBSKT() returns structured RebalanceResult with txHash, oldTokens/oldWeights, newTokens/newWeights, gasUsed, and parsed BSKTRebalanced event data.\n\n### 2. Rebalance dry-run (unit test)\n\n1. Run `npx vitest run tests/alvara-rebalance.test.ts -t \"dry run\"`\n2. **Expected:** Test passes — routes fetched, gas estimated, but no transaction sent. Result has txHash: null, gasEstimate populated.\n\n### 3. Owner mismatch guard (unit test)\n\n1. Run `npx vitest run tests/alvara-rebalance.test.ts -t \"owner mismatch\"`\n2. **Expected:** Test passes — rebalanceBSKT() throws before any API call when wallet is not the BSKT owner.\n\n### 4. Emergency stables conversion (unit test)\n\n1. Run `npx vitest run tests/alvara-emergency.test.ts -t \"converts to emergency stables\"`\n2. **Expected:** Test passes — emergencyStables() snapshots current composition, calls rebalanceBSKT with [USDT, ALVA] at [9500, 500] bps and EMERGENCY_STABLES mode.\n\n### 5. Emergency revert from snapshot (unit test)\n\n1. Run `npx vitest run tests/alvara-emergency.test.ts -t \"reverts to original\"`\n2. **Expected:** Test passes — emergencyRevert() accepts snapshot, calls rebalanceBSKT with original tokens/weights and REVERT_EMERGENCY mode.\n\n### 6. CLI rebalance help output\n\n1. Run `npx tsx scripts/rebalance-bskt.ts --help`\n2. **Expected:** Prints usage showing --bskt-address, --new-tokens, --new-weights, --mode, --dry-run flags with descriptions.\n\n### 7. CLI emergency help output\n\n1. Run `npx tsx scripts/emergency-stables.ts --help`\n2. **Expected:** Prints usage showing default stables mode and --revert --snapshot-file mode.\n\n### 8. CLI rebalance arg validation — weights don't sum to 10000\n\n1. Run `PRIVATE_KEY=0x0000...0001 npx tsx scripts/rebalance-bskt.ts --bskt-address 0x1234...5678 --new-tokens 0xAAA,0xBBB --new-weights 5000,4000`\n2. **Expected:** Exits with error \"Weights must sum to 10000 bps\" (9000 ≠ 10000). No API or RPC calls made.\n\n### 9. CLI rebalance arg validation — token/weight count mismatch\n\n1. Run `PRIVATE_KEY=0x0000...0001 npx tsx scripts/rebalance-bskt.ts --bskt-address 0x1234...5678 --new-tokens 0xAAA,0xBBB --new-weights 10000`\n2. **Expected:** Exits with error about token count not matching weight count.\n\n### 10. Full regression suite\n\n1. Run `npx vitest run tests/alvara-rebalance.test.ts tests/alvara-emergency.test.ts tests/alvara-contribute.test.ts tests/alvara-api.test.ts`\n2. **Expected:** 80 tests pass, 0 failures, exit 0.\n\n## Edge Cases\n\n### Empty snapshot revert\n\n1. Run `npx vitest run tests/alvara-emergency.test.ts -t \"empty snapshot\"`\n2. **Expected:** emergencyRevert() throws validation error when snapshot has no tokens.\n\n### Snapshot weight type handling\n\n1. Run `npx vitest run tests/alvara-emergency.test.ts -t \"bigint\"`\n2. **Expected:** emergencyRevert() correctly converts bigint weights from snapshot to number array for rebalanceBSKT().\n\n### Missing BSKTRebalanced event\n\n1. Run `npx vitest run tests/alvara-rebalance.test.ts -t \"event not found\"`\n2. **Expected:** rebalanceBSKT() returns result with event: null and logs a warning — does not throw.\n\n## Failure Signals\n\n- Any of the 80 tests failing in the regression suite\n- CLI scripts crashing on --help instead of printing usage\n- rebalanceBSKT() making API calls before owner check (security regression)\n- emergencyStables() producing weights that don't sum to 10000 bps\n- Snapshot file I/O failure in emergency-stables.ts CLI\n\n## Not Proven By This UAT\n\n- Live on-chain rebalance against a real BSKT (requires funded wallet + BSKT ownership)\n- Alvara backend API route signing for rebalance endpoint (mocked in tests)\n- Gas estimation accuracy on Base mainnet\n- BSKTRebalanced event parsing from real transaction receipts\n- Snapshot file persistence across process restarts in production\n\n## Notes for Tester\n\n- All tests use mocked viem clients and API responses — no real RPC or API calls\n- The emergency stables target is hardcoded at 95% USDT + 5% ALVA (9500 + 500 bps) per the Alvara minimum ALVA requirement (K006)\n- Snapshot files use string-encoded weights for bigint JSON safety — emergencyRevert() handles the conversion back\n- D031 documents that no dedicated emergencyStables() function exists on-chain; it's implemented as a standard rebalance() call with specific target weights\n",
       "goal": "Deliver rebalanceBSKT() orchestration, emergency stables conversion + revert, and CLI scripts — all using the Alvara backend-signed route pattern from S01.",
       "success_criteria": "- `npx vitest run tests/alvara-rebalance.test.ts` — all tests pass (happy path, dry run, errors, owner mismatch, event parsing)\n- `npx vitest run tests/alvara-emergency.test.ts` — all tests pass (emergency stables, revert, composition snapshot, validation)\n- `npx vitest run tests/alvara-contribute.test.ts tests/alvara-api.test.ts` — existing tests still pass (backward compatibility)\n- `scripts/rebalance-bskt.ts --help` and `scripts/emergency-stables.ts --help` print usage without errors\n- USDT address present in `src/config/chains.ts` KNOWN_ADDRESSES",
       "proof_level": "Contract — all logic verified through unit tests with mocked API + contract calls. No real on-chain transactions.",
@@ -321,11 +321,11 @@
       "completed_at": null,
       "full_summary_md": "",
       "full_uat_md": "",
-      "goal": "Deploy a Solidity registry contract that stores immutable divestment configurations per fund. Any wallet can read a fund's config (holder split, owner split, trigger type, trigger params, distribution currency). Config is locked on write and cannot be updated — trustless verifiability for holders.",
-      "success_criteria": "- DivestmentRegistry.sol with registerConfig() (one-time write) and getConfig() (public read)\\n- Config struct: holderSplitBps, ownerSplitBps, triggerType, triggerParams, distributionCurrency, creator, registeredAt\\n- Immutability: registerConfig reverts if fundId already registered\\n- Forge test suite covering registration, read, duplicate rejection, and edge cases\\n- TypeScript client in src/registry/ for read/write\\n- Deploy script for Base (Ethereum deployment deferred to integration if gas costs warrant)\\n- Foundry project under contracts/",
-      "proof_level": "On-chain proof — deployed contract with verified source, config stored and readable",
-      "integration_closure": "Exports registerDivestmentConfig() and getDivestmentConfig() for S05 REST API to call at fund creation time",
-      "observability_impact": "Registration tx hash logged. Config readable by anyone via public view function — no platform dependency for verification.",
+      "goal": "Deploy DivestmentRegistry Solidity contract and build TypeScript client for on-chain registration and public verification of fund divestment configurations. The contract stores immutable config per fund — once registered, overwrite reverts. Supports dual-chain deployment (Base + Ethereum).",
+      "success_criteria": "- `forge test` passes — all Solidity tests green, gas report shows registration < 500k gas\n- `npx vitest run tests/divestment-registry.test.ts` passes — TypeScript client unit tests green\n- Integration test deploys to local anvil, registers config, reads back, verifies overwrite reverts\n- Ethereum chain config exists in `src/config/chains.ts` alongside Base",
+      "proof_level": "This slice proves: contract + integration (via anvil local EVM, not live testnet). Real runtime required: no (anvil simulates EVM faithfully). Human/UAT required: no — anvil integration is deterministic.",
+      "integration_closure": "Upstream surfaces consumed: `src/db/schema.ts` (fundDivestmentConfig field definitions), `src/db/fund-repository.ts` (lockDivestmentConfig as future integration point), `src/config/chains.ts` (chain client factory pattern). New wiring introduced: `src/registry/client.ts` exports registerConfig/getConfig for use by S05 REST API and future pipeline wiring. `src/config/chains.ts` gains Ethereum client factory for R021. What remains before milestone is truly usable end-to-end: S05 wires the registry client into REST endpoints; live testnet/mainnet deployment is a production step beyond M002 scope.",
+      "observability_impact": "Runtime signals: ConfigRegistered event emitted on-chain per registration (indexed by fundId + creator). TypeScript client logs structured `{ ts, module: 'registry', action, fundId, chain, txHash }`. Inspection surfaces: `getConfig(fundId)` reads directly from any RPC — no indexer needed. Deploy script outputs deployed address for each chain. Failure visibility: registration reverts with `AlreadyRegistered(fundId)` or `InvalidSplitBps(holder, owner)` — clear on-chain error messages. Redaction constraints: none — all data is public by design (R009).",
       "sequence": 0,
       "replan_triggered_at": null
     },
@@ -1664,6 +1664,143 @@
       "observability_impact": "",
       "full_plan_md": "",
       "sequence": 0
+    },
+    {
+      "milestone_id": "M002",
+      "slice_id": "S04",
+      "id": "T01",
+      "title": "Wrote DivestmentRegistry.sol with immutable one-shot registration, 12 Forge tests, and extracted ABI — max gas 161k under 500k limit",
+      "status": "complete",
+      "one_liner": "Wrote DivestmentRegistry.sol with immutable one-shot registration, 12 Forge tests, and extracted ABI — max gas 161k under 500k limit",
+      "narrative": "Installed Foundry, scaffolded contracts/ directory, wrote DivestmentRegistry.sol mirroring the off-chain fundDivestmentConfig schema with custom errors (AlreadyRegistered, InvalidSplitBps), no proxy/owner/admin. Wrote 12 Forge tests covering happy path, reverts, boundary conditions, and event emission. Extracted ABI to src/config/divestment-registry-abi.json for the TypeScript client in T02.",
+      "verification_result": "All three slice verification checks pass: forge test -vvv (12/12 pass), gas report shows registerConfig max 161,317 (< 500k), ABI file exists at src/config/divestment-registry-abi.json.",
+      "duration": "",
+      "completed_at": "2026-04-07T19:22:08.014Z",
+      "blocker_discovered": false,
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "contracts/src/DivestmentRegistry.sol",
+        "contracts/test/DivestmentRegistry.t.sol",
+        "src/config/divestment-registry-abi.json",
+        "contracts/foundry.toml"
+      ],
+      "key_decisions": [
+        "Fully immutable contract — no proxy, no owner, no admin",
+        "Custom errors instead of require strings for gas efficiency and structured decoding",
+        "triggerParams as raw bytes for flexible trigger type encoding"
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S04\nmilestone: M002\nkey_files:\n  - contracts/src/DivestmentRegistry.sol\n  - contracts/test/DivestmentRegistry.t.sol\n  - src/config/divestment-registry-abi.json\n  - contracts/foundry.toml\nkey_decisions:\n  - Fully immutable contract — no proxy, no owner, no admin\n  - Custom errors instead of require strings for gas efficiency and structured decoding\n  - triggerParams as raw bytes for flexible trigger type encoding\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:22:08.013Z\nblocker_discovered: false\n---\n\n# T01: Wrote DivestmentRegistry.sol with immutable one-shot registration, 12 Forge tests, and extracted ABI — max gas 161k under 500k limit\n\n**Wrote DivestmentRegistry.sol with immutable one-shot registration, 12 Forge tests, and extracted ABI — max gas 161k under 500k limit**\n\n## What Happened\n\nInstalled Foundry, scaffolded contracts/ directory, wrote DivestmentRegistry.sol mirroring the off-chain fundDivestmentConfig schema with custom errors (AlreadyRegistered, InvalidSplitBps), no proxy/owner/admin. Wrote 12 Forge tests covering happy path, reverts, boundary conditions, and event emission. Extracted ABI to src/config/divestment-registry-abi.json for the TypeScript client in T02.\n\n## Verification\n\nAll three slice verification checks pass: forge test -vvv (12/12 pass), gas report shows registerConfig max 161,317 (< 500k), ABI file exists at src/config/divestment-registry-abi.json.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `cd contracts && forge test -vvv` | 0 | ✅ pass | 20000ms |\n| 2 | `cd contracts && forge test --gas-report 2>&1 | grep registerConfig` | 0 | ✅ pass (161,317 < 500k) | 20000ms |\n| 3 | `test -f src/config/divestment-registry-abi.json` | 0 | ✅ pass | 100ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `contracts/src/DivestmentRegistry.sol`\n- `contracts/test/DivestmentRegistry.t.sol`\n- `src/config/divestment-registry-abi.json`\n- `contracts/foundry.toml`\n",
+      "description": "Install Foundry, scaffold the contracts/ directory, write DivestmentRegistry.sol with immutable per-fund config storage and one-shot registration, write comprehensive Forge tests, and verify gas < 500k.\n\n## Steps\n\n1. Install Foundry: `curl -L https://foundry.paradigm.xyz | bash` then `foundryup`. Verify `forge --version`.\n2. Create `contracts/` directory. Run `forge init contracts --no-git --no-commit` (or manually create foundry.toml + src/ + test/ structure).\n3. Write `contracts/src/DivestmentRegistry.sol`:\n   - Struct `DivestmentConfig`: holderSplitBps (uint16), ownerSplitBps (uint16), triggerType (uint8), triggerParams (bytes), distributionCurrency (address), creator (address), registeredAt (uint64)\n   - `mapping(bytes32 => DivestmentConfig) public configs` — maps fund ID hash to config\n   - `mapping(bytes32 => bool) public registered` — tracks whether a fund has been registered\n   - `function registerConfig(bytes32 fundId, uint16 holderSplitBps, uint16 ownerSplitBps, uint8 triggerType, bytes calldata triggerParams, address distributionCurrency) external`\n   - Validation: `holderSplitBps + ownerSplitBps == 10000`, revert `InvalidSplitBps` if not\n   - Revert `AlreadyRegistered(fundId)` if `registered[fundId]` is true\n   - Store config with `creator = msg.sender`, `registeredAt = block.timestamp`\n   - Emit `ConfigRegistered(bytes32 indexed fundId, address indexed creator)`\n   - `function getConfig(bytes32 fundId) external view returns (DivestmentConfig memory)`\n   - No constructor args, no owner, no proxy, no admin — fully immutable contract\n4. Write `contracts/test/DivestmentRegistry.t.sol`:\n   - Test: register config and read back all fields\n   - Test: second registration with same fundId reverts with AlreadyRegistered\n   - Test: different fundId succeeds (independent namespaces)\n   - Test: holderSplitBps + ownerSplitBps != 10000 reverts with InvalidSplitBps\n   - Test: zero-length triggerParams works (valid edge case)\n   - Test: registeredAt matches block.timestamp\n   - Test: creator matches msg.sender\n   - Test: ConfigRegistered event emitted with correct indexed fields\n5. Run `forge build` — must compile cleanly.\n6. Run `forge test -vvv` — all tests pass.\n7. Run `forge test --gas-report` — registration gas must be < 500k.\n8. Copy the compiled ABI JSON from `contracts/out/DivestmentRegistry.sol/DivestmentRegistry.json` — extract just the `abi` array to `src/config/divestment-registry-abi.json` for the TypeScript client.\n\n## Must-Haves\n\n- [ ] DivestmentRegistry.sol compiles with no warnings\n- [ ] All Forge tests pass\n- [ ] Registration gas < 500k (from gas report)\n- [ ] ABI JSON extracted to src/config/divestment-registry-abi.json\n- [ ] No proxy pattern, no owner, no admin — contract is immutable\n\n## Negative Tests\n\n- **Malformed inputs**: holderSplitBps + ownerSplitBps != 10000 → InvalidSplitBps revert\n- **Error paths**: duplicate registration → AlreadyRegistered revert\n- **Boundary conditions**: zero-length triggerParams, max uint16 values for bps fields\n\n## Verification\n\n- `cd contracts && forge test -vvv` — all tests pass\n- `cd contracts && forge test --gas-report 2>&1 | grep registerConfig` — gas < 500k\n- `test -f src/config/divestment-registry-abi.json` — ABI file exists",
+      "estimate": "1.5h",
+      "files": [
+        "contracts/foundry.toml",
+        "contracts/src/DivestmentRegistry.sol",
+        "contracts/test/DivestmentRegistry.t.sol",
+        "src/config/divestment-registry-abi.json"
+      ],
+      "verify": "cd contracts && forge test -vvv && forge test --gas-report 2>&1 | grep registerConfig && test -f ../src/config/divestment-registry-abi.json",
+      "inputs": [
+        "`src/db/schema.ts` — fundDivestmentConfig field definitions to mirror on-chain",
+        "`src/db/errors.ts` — ConfigLocked pattern to replicate as AlreadyRegistered"
+      ],
+      "expected_output": [
+        "`contracts/foundry.toml` — Foundry project config",
+        "`contracts/src/DivestmentRegistry.sol` — the registry contract",
+        "`contracts/test/DivestmentRegistry.t.sol` — Forge tests for all paths",
+        "`src/config/divestment-registry-abi.json` — compiled ABI for TypeScript client"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M002",
+      "slice_id": "S04",
+      "id": "T02",
+      "title": "Build TypeScript registry client with Ethereum chain config and unit tests",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Create the TypeScript client that wraps viem calls for DivestmentRegistry interaction, add Ethereum chain config to support dual-chain deployment (R021), and write comprehensive vitest unit tests with mocked viem.\n\n## Steps\n\n1. Add Ethereum chain config to `src/config/chains.ts`:\n   - Import `mainnet` from `viem/chains`\n   - Add `ETHEREUM_KNOWN_ADDRESSES` with USDC, WETH, USDT addresses on Ethereum mainnet\n   - Add `ETH_RPCS` array (drpc.org primary, public fallback)\n   - Add `createEthereumClient(rpcIndex?)` following the same pattern as `createBaseClient()`\n   - Export the new chain and factory alongside existing Base exports\n2. Create `src/registry/types.ts`:\n   - `OnChainDivestmentConfig` interface matching the Solidity struct fields (TypeScript types)\n   - `RegisterConfigParams` — input type for registerConfig()\n   - `TriggerType` enum: Time=0, Threshold=1, Both=2\n   - Re-export relevant viem types used by the client\n3. Create `src/registry/client.ts`:\n   - `fundIdToBytes32(uuid: string): Hex` — `keccak256(toHex(uuid))` to convert PostgreSQL UUID to on-chain key\n   - `encodeTriggerParams(triggerType: TriggerType, params: Record<string, unknown>): Hex` — ABI-encode trigger params per type:\n     - Time: `encodeAbiParameters([{type:'uint256'}], [timeMs])` \n     - Threshold: `encodeAbiParameters([{type:'uint256'}], [thresholdUsd])`\n     - Both: `encodeAbiParameters([{type:'uint256'},{type:'uint256'}], [timeMs, thresholdUsd])`\n   - `decodeTriggerParams(triggerType: number, data: Hex): Record<string, unknown>` — reverse of encode\n   - `registerConfig(walletClient, publicClient, registryAddress, params: RegisterConfigParams): Promise<{txHash, gasUsed}>` — sends registerConfig tx, waits for receipt, returns hash + gas\n   - `getConfig(publicClient, registryAddress, fundId: string): Promise<OnChainDivestmentConfig | null>` — reads config, returns null if not registered\n   - Load ABI from `src/config/divestment-registry-abi.json`\n   - Follow the injected client pattern from `src/alvara/contribute.ts` (walletClient + publicClient as params)\n   - Structured logging: `{ ts, module: 'registry', action, fundId, chain, txHash }`\n4. Create `src/registry/index.ts` — barrel export for client and types.\n5. Write `tests/divestment-registry.test.ts`:\n   - Test fundIdToBytes32 produces deterministic bytes32 for known UUIDs\n   - Test encodeTriggerParams/decodeTriggerParams roundtrip for each trigger type\n   - Test registerConfig calls writeContract with correct args (mock walletClient + publicClient)\n   - Test getConfig calls readContract and maps result correctly\n   - Test getConfig returns null for unregistered fund\n   - Test InvalidSplitBps validation (if client-side validation is added)\n   - Use vi.mock() pattern consistent with existing tests\n\n## Must-Haves\n\n- [ ] `createEthereumClient()` exists in chains.ts and works (R021 support)\n- [ ] fundIdToBytes32 is deterministic — same UUID always produces same bytes32\n- [ ] encodeTriggerParams/decodeTriggerParams roundtrip correctly for all trigger types\n- [ ] registerConfig follows injected-client pattern (walletClient + publicClient params)\n- [ ] All vitest tests pass\n\n## Verification\n\n- `npx vitest run tests/divestment-registry.test.ts` — all tests pass\n- `grep -q 'createEthereumClient' src/config/chains.ts` — Ethereum config exists",
+      "estimate": "1.5h",
+      "files": [
+        "src/config/chains.ts",
+        "src/registry/types.ts",
+        "src/registry/client.ts",
+        "src/registry/index.ts",
+        "tests/divestment-registry.test.ts"
+      ],
+      "verify": "npx vitest run tests/divestment-registry.test.ts && grep -q 'createEthereumClient' src/config/chains.ts",
+      "inputs": [
+        "`src/config/divestment-registry-abi.json` — compiled ABI from T01",
+        "`src/config/chains.ts` — existing Base chain config to extend with Ethereum",
+        "`src/alvara/contribute.ts` — injected client pattern to follow",
+        "`src/db/schema.ts` — fundDivestmentConfig fields to map",
+        "`src/db/types.ts` — FundDivestmentConfig TypeScript type for reference"
+      ],
+      "expected_output": [
+        "`src/config/chains.ts` — updated with Ethereum chain config + createEthereumClient()",
+        "`src/registry/types.ts` — OnChainDivestmentConfig, RegisterConfigParams, TriggerType",
+        "`src/registry/client.ts` — registerConfig, getConfig, fundIdToBytes32, encode/decodeTriggerParams",
+        "`src/registry/index.ts` — barrel exports",
+        "`tests/divestment-registry.test.ts` — vitest unit tests with mocked viem"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M002",
+      "slice_id": "S04",
+      "id": "T03",
+      "title": "Write deploy script and anvil integration test proving full registry flow",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Write a viem-based deployment script for DivestmentRegistry and an integration test using Foundry's anvil (local EVM) that proves the full flow: deploy → register → read back → overwrite reverts → gas check. This is the slice's integration proof.\n\n## Steps\n\n1. Write `scripts/deploy-registry.ts`:\n   - Accept `--chain base|ethereum` and `--rpc-url` flags (use parseArgs or simple argv parsing)\n   - Load deployer private key from `DEPLOYER_PRIVATE_KEY` env var\n   - Use viem's `deployContract()` with the ABI + bytecode from the compiled Foundry artifact\n   - Load bytecode from `contracts/out/DivestmentRegistry.sol/DivestmentRegistry.json` (the `bytecode.object` field)\n   - Wait for deployment receipt, log deployed address\n   - Output: `{ chain, address, txHash, gasUsed, deployer }` as structured JSON\n   - Graceful error if env var missing: print usage and exit 1\n2. Write `tests/registry-integration.test.ts`:\n   - `beforeAll`: check if `anvil` is available (`which anvil`), `ctx.skip()` if not (same graceful-skip pattern as fund-repository.test.ts per K012)\n   - `beforeAll`: start anvil on a random port, create viem clients pointed at it\n   - Test: deploy DivestmentRegistry via the deployment helper (extract deploy logic into a shared function)\n   - Test: register a config with known UUID, read it back, verify all fields match\n   - Test: read config from a different account (publicClient only) — same result (public verifiability, R009)\n   - Test: attempt to register same fundId again — verify it reverts with AlreadyRegistered\n   - Test: verify gas used for registration is < 500k\n   - `afterAll`: kill anvil process\n3. Extract the deploy logic from the script into a reusable function in `src/registry/deploy.ts`:\n   - `deployRegistry(walletClient, publicClient): Promise<{address, txHash, gasUsed}>`\n   - Both the CLI script and integration test use this function\n   - Load bytecode from Foundry output artifact\n4. Update `src/registry/index.ts` to also export deploy function.\n\n## Must-Haves\n\n- [ ] Deploy script works with `--chain base` and `--chain ethereum` flags\n- [ ] Integration test deploys to anvil and exercises full register → read → overwrite-revert flow\n- [ ] Gas verification: registration < 500k gas (asserted in integration test)\n- [ ] Graceful skip when anvil is unavailable (vitest exits 0)\n- [ ] Deploy helper is reusable (not just a script)\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| anvil process | ctx.skip() — test suite skips gracefully | 10s startup timeout → skip | N/A |\n| Foundry artifacts | Error if bytecode file missing — clear message pointing to `forge build` | N/A | JSON parse error with file path in message |\n\n## Verification\n\n- `npx vitest run tests/registry-integration.test.ts` — passes (or skips gracefully if anvil unavailable)\n- `npx tsx scripts/deploy-registry.ts --help` — prints usage without crashing\n- `test -f src/registry/deploy.ts` — deploy helper exists",
+      "estimate": "1.5h",
+      "files": [
+        "scripts/deploy-registry.ts",
+        "tests/registry-integration.test.ts",
+        "src/registry/deploy.ts",
+        "src/registry/index.ts"
+      ],
+      "verify": "npx vitest run tests/registry-integration.test.ts && npx tsx scripts/deploy-registry.ts --help",
+      "inputs": [
+        "`src/config/divestment-registry-abi.json` — ABI from T01",
+        "`contracts/out/DivestmentRegistry.sol/DivestmentRegistry.json` — bytecode from T01 compilation",
+        "`src/registry/client.ts` — registerConfig and getConfig from T02",
+        "`src/registry/types.ts` — types from T02",
+        "`src/config/chains.ts` — chain config with Ethereum support from T02"
+      ],
+      "expected_output": [
+        "`scripts/deploy-registry.ts` — CLI deploy script for Base/Ethereum",
+        "`tests/registry-integration.test.ts` — anvil-based integration test",
+        "`src/registry/deploy.ts` — reusable deploy helper function",
+        "`src/registry/index.ts` — updated barrel exports with deploy"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
     }
   ],
   "decisions": [
@@ -2758,6 +2895,39 @@
       "verdict": "✅ pass",
       "duration_ms": 26500,
       "created_at": "2026-04-07T19:08:08.148Z"
+    },
+    {
+      "id": 63,
+      "task_id": "T01",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "cd contracts && forge test -vvv",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 20000,
+      "created_at": "2026-04-07T19:22:08.014Z"
+    },
+    {
+      "id": 64,
+      "task_id": "T01",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "cd contracts && forge test --gas-report 2>&1 | grep registerConfig",
+      "exit_code": 0,
+      "verdict": "✅ pass (161,317 < 500k)",
+      "duration_ms": 20000,
+      "created_at": "2026-04-07T19:22:08.014Z"
+    },
+    {
+      "id": 65,
+      "task_id": "T01",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "test -f src/config/divestment-registry-abi.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T19:22:08.014Z"
     }
   ]
 }
