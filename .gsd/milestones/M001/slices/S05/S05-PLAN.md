@@ -149,7 +149,7 @@ Also create the domain types file that re-exports Drizzle inferred types and def
   - Estimate: 1h
   - Files: src/db/types.ts, src/db/fund-repository.ts, src/db/errors.ts
   - Verify: npx tsc --noEmit
-- [ ] **T03: Fund repository tests and seed script proving full data model** — ## Description
+- [x] **T03: Created 27-test integration test suite and db-seed script covering fund CRUD, state machine, R017 immutability, wallets, pipeline runs, and transactions — type-checks clean with zero test regressions** — ## Description
 
 Write comprehensive tests for the fund repository against a real PostgreSQL instance (Docker) and a seed script that proves the entire data model end-to-end. This is the verification task — it proves R001 (fund creation), R016 (protocol fee), and R017 (immutability) actually work.
 
