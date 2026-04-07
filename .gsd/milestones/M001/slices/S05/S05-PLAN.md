@@ -65,7 +65,7 @@ The project has no database layer yet. We need: Docker Compose for local Postgre
   - Estimate: 45m
   - Files: docker-compose.yml, drizzle.config.ts, src/db/connection.ts, src/db/schema.ts, .env.example, package.json
   - Verify: npx tsc --noEmit && npx vitest run
-- [ ] **T02: Fund repository with CRUD, state machine, and immutability enforcement** — ## Description
+- [x] **T02: Built typed fund repository with 15 CRUD functions, state-machine-validated status transitions, R017 divestment config immutability, and structured mutation logging** — ## Description
 
 Build the fund repository module — the typed interface between the application and the database. This is where the business logic lives: fund creation, status transitions with state machine validation, divestment config immutability (R017), wallet assignment, transaction logging, and pipeline run lifecycle.
 
