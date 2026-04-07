@@ -1,4 +1,4 @@
-import { createPublicClient, http, type PublicClient, type Address } from 'viem';
+import { createPublicClient, http, type Address } from 'viem';
 import { base } from 'viem/chains';
 
 export { base };
@@ -36,7 +36,7 @@ const BASE_RPCS = [
 /**
  * Create a public client for Base. Falls back through RPC endpoints if one fails.
  */
-export function createBaseClient(rpcIndex = 0): PublicClient {
+export function createBaseClient(rpcIndex = 0) {
   const rpcUrl = BASE_RPCS[rpcIndex] ?? BASE_RPCS[0];
   return createPublicClient({
     chain: base,
