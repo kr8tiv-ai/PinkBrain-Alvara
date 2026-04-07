@@ -103,7 +103,7 @@
   - Estimate: 1h
   - Files: tests/outbound-pipeline.test.ts
   - Verify: npx vitest run tests/outbound-pipeline.test.ts — all tests pass
-- [ ] **T03: Add CLI script for manual outbound pipeline testing** — Create a CLI entry point for manual end-to-end testing of the outbound pipeline, following the pattern established by existing scripts.
+- [x] **T03: Created CLI script with --dry-run and --fund-id args for manual outbound pipeline execution and validation** — Create a CLI entry point for manual end-to-end testing of the outbound pipeline, following the pattern established by existing scripts.
 
 ## Steps
 

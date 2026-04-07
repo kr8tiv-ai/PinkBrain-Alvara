@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T09:52:28.165Z",
+  "exported_at": "2026-04-07T09:55:59.059Z",
   "milestones": [
     {
       "id": "M001",
@@ -945,19 +945,25 @@
       "milestone_id": "M001",
       "slice_id": "S06",
       "id": "T03",
-      "title": "Add CLI script for manual outbound pipeline testing",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Created CLI script with --dry-run and --fund-id args for manual outbound pipeline execution and validation",
+      "status": "complete",
+      "one_liner": "Created CLI script with --dry-run and --fund-id args for manual outbound pipeline execution and validation",
+      "narrative": "Built scripts/outbound-pipeline.ts following the jupiter-swap.ts CLI pattern. Provides dry-run mode (loads fund, validates, prints pipeline plan) and live mode (executes full claim→swap→fee→bridge pipeline). Uses createBagsClient factory, structured JSON logging, proper error handling with exit code 1, and closeDb in finally blocks. Added outbound-pipeline npm script to package.json.",
+      "verification_result": "--help prints usage and exits 0 with all imports resolving. Missing --fund-id prints error and exits 1. --dry-run --fund-id test loads all imports, reaches DB layer (expected connection error without Postgres). All 20 existing outbound pipeline tests pass with no regressions.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T09:55:59.005Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "scripts/outbound-pipeline.ts",
+        "package.json"
+      ],
+      "key_decisions": [
+        "Used createBagsClient factory from src/bags/client.ts rather than raw BagsSDK constructor",
+        "Added BAGS_API_KEY to required env vars since BagsSDK initialization requires it"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S06\nmilestone: M001\nkey_files:\n  - scripts/outbound-pipeline.ts\n  - package.json\nkey_decisions:\n  - Used createBagsClient factory from src/bags/client.ts rather than raw BagsSDK constructor\n  - Added BAGS_API_KEY to required env vars since BagsSDK initialization requires it\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T09:55:59.005Z\nblocker_discovered: false\n---\n\n# T03: Created CLI script with --dry-run and --fund-id args for manual outbound pipeline execution and validation\n\n**Created CLI script with --dry-run and --fund-id args for manual outbound pipeline execution and validation**\n\n## What Happened\n\nBuilt scripts/outbound-pipeline.ts following the jupiter-swap.ts CLI pattern. Provides dry-run mode (loads fund, validates, prints pipeline plan) and live mode (executes full claim→swap→fee→bridge pipeline). Uses createBagsClient factory, structured JSON logging, proper error handling with exit code 1, and closeDb in finally blocks. Added outbound-pipeline npm script to package.json.\n\n## Verification\n\n--help prints usage and exits 0 with all imports resolving. Missing --fund-id prints error and exits 1. --dry-run --fund-id test loads all imports, reaches DB layer (expected connection error without Postgres). All 20 existing outbound pipeline tests pass with no regressions.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx tsx scripts/outbound-pipeline.ts --help` | 0 | ✅ pass | 3200ms |\n| 2 | `npx tsx scripts/outbound-pipeline.ts` | 1 | ✅ pass | 2800ms |\n| 3 | `npx tsx scripts/outbound-pipeline.ts --dry-run --fund-id test` | 1 | ✅ pass | 3000ms |\n| 4 | `npx vitest run tests/outbound-pipeline.test.ts` | 0 | ✅ pass | 3200ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `scripts/outbound-pipeline.ts`\n- `package.json`\n",
       "description": "Create a CLI entry point for manual end-to-end testing of the outbound pipeline, following the pattern established by existing scripts.\n\n## Steps\n\n1. Create `scripts/outbound-pipeline.ts` following the pattern in `scripts/jupiter-swap.ts`:\n   - `#!/usr/bin/env tsx` shebang\n   - `import 'dotenv/config'`\n   - Structured `log(phase, action, data)` helper\n   - Parse args: `--fund-id <uuid>` (required), `--dry-run` (optional flag)\n   - Validate required env vars: `DATABASE_URL`, `SOL_PRIVATE_KEY`, `PLATFORM_TREASURY_WALLET`\n\n2. In dry-run mode:\n   - Connect to DB, load fund by ID, print fund details and wallets\n   - Validate fund is active\n   - Print what would happen: \"Would claim reflections for mint X, swap to USDC, deduct Y% fee, bridge to Base wallet Z\"\n   - Exit without executing\n\n3. In live mode:\n   - Create Solana connection via `createSolanaConnection()`\n   - Load keypair via `loadSolanaKeypair(process.env.SOL_PRIVATE_KEY)`\n   - Create BagsSDK instance\n   - Create DB connection\n   - Call `runOutboundPipeline({ fundId, sdk, wallet, connection, db, platformTreasuryWallet })`\n   - Print result: pipeline run ID, all tx hashes, amounts, fee deducted, duration\n\n4. Add error handling with human-readable output and exit code 1 on failure.\n\n5. Add npm script to package.json: `\"outbound-pipeline\": \"tsx scripts/outbound-pipeline.ts\"`\n\n## Important constraints\n- Follow the exact CLI pattern from `scripts/jupiter-swap.ts` (dotenv, arg parsing, structured logging, phase/action pattern)\n- The BagsSDK constructor signature: `new BagsSDK()` (check `src/bags/client.ts` for actual init)\n- DB connection: use `createDb()` from `src/db/connection.ts`",
       "estimate": "30m",
       "files": [
@@ -1651,6 +1657,50 @@
       "verdict": "✅ pass",
       "duration_ms": 3370,
       "created_at": "2026-04-07T09:52:28.100Z"
+    },
+    {
+      "id": 30,
+      "task_id": "T03",
+      "slice_id": "S06",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/outbound-pipeline.ts --help",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3200,
+      "created_at": "2026-04-07T09:55:59.005Z"
+    },
+    {
+      "id": 31,
+      "task_id": "T03",
+      "slice_id": "S06",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/outbound-pipeline.ts",
+      "exit_code": 1,
+      "verdict": "✅ pass",
+      "duration_ms": 2800,
+      "created_at": "2026-04-07T09:55:59.005Z"
+    },
+    {
+      "id": 32,
+      "task_id": "T03",
+      "slice_id": "S06",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/outbound-pipeline.ts --dry-run --fund-id test",
+      "exit_code": 1,
+      "verdict": "✅ pass",
+      "duration_ms": 3000,
+      "created_at": "2026-04-07T09:55:59.005Z"
+    },
+    {
+      "id": 33,
+      "task_id": "T03",
+      "slice_id": "S06",
+      "milestone_id": "M001",
+      "command": "npx vitest run tests/outbound-pipeline.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3200,
+      "created_at": "2026-04-07T09:55:59.005Z"
     }
   ]
 }
