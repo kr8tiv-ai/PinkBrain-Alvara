@@ -1,1 +1,0 @@
-Update GSD state: decisions, requirements, event log after milestone completion  
