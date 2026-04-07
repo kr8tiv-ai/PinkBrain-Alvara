@@ -11,7 +11,9 @@
     "bridge": "tsx scripts/bridge-sol-to-base.ts",
     "bridge-estimate": "tsx scripts/bridge-sol-to-base.ts --estimate-only",
     "bridge-status": "tsx scripts/check-bridge-status.ts",
-    "bags-fee-share": "tsx scripts/bags-fee-share.ts"
+    "bags-fee-share": "tsx scripts/bags-fee-share.ts",
+    "jupiter-swap": "tsx scripts/jupiter-swap.ts",
+    "jupiter-estimate": "tsx scripts/jupiter-swap.ts --estimate-only"
   },
   "dependencies": {
     "@bagsfm/bags-sdk": "^1.3.5",

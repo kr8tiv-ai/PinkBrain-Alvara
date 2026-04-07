@@ -12,6 +12,10 @@ export const SOLANA_KNOWN_ADDRESSES = {
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   /** Native SOL placeholder (system program) */
   NATIVE_SOL: '11111111111111111111111111111111',
+  /** Wrapped SOL (wSOL) SPL token mint */
+  WRAPPED_SOL: 'So11111111111111111111111111111111111111112',
+  /** SPL Token Program ID */
+  SPL_TOKEN_PROGRAM_ID: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
 } as const;
 
 /** Solana RPC endpoints — primary + fallbacks */

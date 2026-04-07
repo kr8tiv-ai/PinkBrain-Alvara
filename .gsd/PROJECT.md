@@ -12,7 +12,7 @@ Any Bags.fm token creator can set up a fully automated investment fund that tran
 
 ## Current State
 
-**M001: S01 ✅, S02 ✅.** Two of six subsystem proofs complete.
+**M001: S01 ✅, S02 ✅, S03 ✅.** Three of six subsystem proofs complete.
 
 **S01 (Alvara Factory Discovery & BSKT Proof)** delivered:
 - Alvara BSKTs are ERC-721 NFTs (not standard ERC-7621) with custom view functions
@@ -29,7 +29,15 @@ Any Bags.fm token creator can set up a fully automated investment fund that tran
 - CLI scripts for bridging and status checking
 - Key discovery: create-tx endpoint uses GET (not POST), requires dstChainTokenOutAmount=auto
 
-Remaining: S03 (Bags SDK), S04 (Jupiter/holders) are independent. S05–S06 depend on all prior slices.
+**S03 (Bags SDK Fee Share & Reflection Claiming)** delivered:
+- Complete Bags SDK integration: client wrapper, fee share admin queries, config updates, fee claiming
+- 4 modules: types.ts, client.ts, fee-share.ts, fee-claim.ts with 10 exported functions
+- Client-side basis points validation (sum-to-10000) before any SDK call
+- CLI proof script with --dry-run mode showing all 6 API response shapes
+- 42 unit tests (14 client, 28 fee-share/claim) — all mocked, zero network calls
+- Pattern: functions accept SDK instance as first param for mock injection testability
+
+Remaining: S04 (Jupiter/holders) is independent. S05–S06 depend on all prior slices.
 
 ## Architecture / Key Patterns
 
@@ -57,15 +65,17 @@ Remaining: S03 (Bags SDK), S04 (Jupiter/holders) are independent. S05–S06 depe
 - Bags SDK rate limit: 1,000 req/hour per API key
 - deBridge create-tx is GET with query params; dstChainTokenOutAmount=auto required
 
-**Established patterns (S01 + S02):**
+**Established patterns (S01 + S02 + S03):**
 - Blockscout free API for Base chain (Etherscan V2 as optional fallback with paid key)
 - EIP-1967 proxy detection for Alvara contract resolution
 - Structured JSON logging with module/phase/action fields
 - 250ms delays between sequential RPC reads for public endpoint rate limits
 - BSKT ABI discovery chain: factory → bsktImplementation (beacon) → implementation → logic ABI
-- Thin REST API clients with typed inputs/outputs (no SDK dependencies)
+- Thin REST API clients with typed inputs/outputs (no SDK dependencies) — deBridge pattern
+- SDK wrapper with mock injection — functions accept SDK instance, not raw API key — Bags pattern
+- Client-side input validation before SDK/API calls (basis points sum, wallet format)
 - Dual-mode CLI scripts: safe estimate/dry-run vs full execution
-- vitest with fetch mocking for API client unit tests
+- vitest with fetch mocking and SDK mock injection for unit tests
 
 ## Capability Contract
 
@@ -73,7 +83,7 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 
 ## Milestone Sequence
 
-- [ ] M001: Risk Retirement & Subsystem Proof — S01 ✅, S02 ✅, S03–S06 remaining
+- [ ] M001: Risk Retirement & Subsystem Proof — S01 ✅, S02 ✅, S03 ✅, S04–S06 remaining
 - [ ] M002: Outbound Pipeline (Solana → Alvara) — Reflections flow automatically from Bags.fm into Alvara baskets
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation

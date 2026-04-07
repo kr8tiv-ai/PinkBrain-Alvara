@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T08:26:58.743Z",
+  "exported_at": "2026-04-07T08:43:43.662Z",
   "milestones": [
     {
       "id": "M001",
@@ -124,14 +124,14 @@
       "milestone_id": "M001",
       "id": "S03",
       "title": "Bags SDK Fee Share & Reflection Claiming",
-      "status": "pending",
+      "status": "complete",
       "risk": "medium",
       "depends": [],
       "demo": "Fee share for a test token redirected to a treasury wallet and accumulated fees claimed via Bags SDK",
       "created_at": "2026-04-07T04:43:57.107Z",
-      "completed_at": null,
-      "full_summary_md": "",
-      "full_uat_md": "",
+      "completed_at": "2026-04-07T08:29:23.339Z",
+      "full_summary_md": "---\nid: S03\nparent: M001\nmilestone: M001\nprovides:\n  - Bags SDK client wrapper (createBagsClient, pingApi, fetchWithTimeout, BAGS_API_BASE)\n  - Fee share admin modules (getAdminTokenList, getClaimablePositions, buildUpdateConfigTransaction)\n  - Fee claiming modules (getClaimTransactions, signAndSendClaimTransactions)\n  - CLI proof script with --dry-run mode for all Bags API operations\n  - Bags module type definitions (BagsClientConfig, BagsFeeShareUpdateConfig, etc.)\nrequires:\n  []\naffects:\n  - S05\n  - S06\nkey_files:\n  - src/bags/types.ts\n  - src/bags/client.ts\n  - src/bags/fee-share.ts\n  - src/bags/fee-claim.ts\n  - scripts/bags-fee-share.ts\n  - tests/bags-client.test.ts\n  - tests/bags-fee-share.test.ts\nkey_decisions:\n  - Functions accept BagsSDK instance as first param (not apiKey string) for testability via mock injection\n  - Client-side basis points validation (sum to 10000) enforced before any SDK call\n  - Dry-run mode outputs all 6 API response shapes as realistic mock JSON — no API key needed\npatterns_established:\n  - SDK wrapper pattern: thin functions accepting SDK instance for mock injection, with input validation, structured logging, and contextual error wrapping\n  - Dual-mode CLI proof scripts: --dry-run with realistic mock shapes, live mode with incremental env validation\n  - Bags module structured logging: module='bags', phase/action fields matching debridge pattern\nobservability_surfaces:\n  - none\ndrill_down_paths:\n  - .gsd/milestones/M001/slices/S03/tasks/T01-SUMMARY.md\n  - .gsd/milestones/M001/slices/S03/tasks/T02-SUMMARY.md\n  - .gsd/milestones/M001/slices/S03/tasks/T03-SUMMARY.md\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-04-07T08:29:23.340Z\nblocker_discovered: false\n---\n\n# S03: Bags SDK Fee Share & Reflection Claiming\n\n**Complete Bags SDK integration for fee share admin queries, config updates, and fee claiming — 4 modules, CLI proof script with dry-run mode, 42 passing tests**\n\n## What Happened\n\nBuilt the full Bags SDK integration in three tasks. T01 installed @bagsfm/bags-sdk v1.3.5, inspected its actual TypeScript declarations, and created the foundational src/bags/ module: types.ts with local interfaces complementing SDK types, client.ts with createBagsClient() factory, pingApi() for key validation, fetchWithTimeout(), structured JSON logging, and BAGS_API_BASE constant. 14 unit tests covering happy paths, timeouts, error responses, malformed data, and empty/whitespace API keys.\n\nT02 built the two core business logic modules. fee-share.ts exports getAdminTokenList (queries which tokens a wallet is fee share admin for), getClaimablePositions (queries accumulated claimable fees), and buildUpdateConfigTransaction (constructs the config update transaction with client-side basis points validation enforcing sum-to-10000 before any SDK call). fee-claim.ts exports getClaimTransactions (gets unsigned claim transactions) and signAndSendClaimTransactions (deserializes, signs, sends, confirms with blockhash expiry handling). All functions accept a BagsSDK instance as first param for testability via mock injection. 28 tests covering happy paths, input validation (empty wallets, invalid mints, bad basis points), error wrapping (SDK errors surfaced with context), and on-chain confirmation failure.\n\nT03 created the CLI proof script (scripts/bags-fee-share.ts) exercising the full flow. Dry-run mode outputs 6 realistic mock JSON response shapes (ping, admin list, claimable positions, update-config tx, claim txs, sign+send results) with zero env vars required. Live mode validates BAGS_API_KEY incrementally and SOL_PRIVATE_KEY only when --claim is passed. Added npm script and documented BAGS_API_KEY in .env.example. All 79 tests pass across 4 files with no regressions.\n\n## Verification\n\n1. `node node_modules/vitest/vitest.mjs run` — 79 tests passed across 4 files (bags-client: 14, bags-fee-share: 28, debridge-api: 20, solana-tx: 17). 2. `node node_modules/.bin/tsx scripts/bags-fee-share.ts --dry-run` — exits 0, outputs 6 valid JSON lines showing all API response shapes. 3. grep confirms @bagsfm/bags-sdk in package.json, bags-fee-share npm script, BAGS_API_KEY in .env.example. 4. All exported functions verified: client.ts (5 exports), fee-share.ts (3 exports), fee-claim.ts (2 exports), types.ts (6 interfaces).\n\n## Requirements Advanced\n\n- R002 — Built complete programmatic interface for fee share configuration (getAdminTokenList, buildUpdateConfigTransaction with basis points validation) and fee claiming (getClaimTransactions, signAndSendClaimTransactions). Validated with 42 unit tests and dry-run CLI proof. Awaits live API key validation in S05/S06.\n\n## Requirements Validated\n\nNone.\n\n## New Requirements Surfaced\n\nNone.\n\n## Requirements Invalidated or Re-scoped\n\nNone.\n\n## Deviations\n\nFunction signatures changed from (apiKey, ...) to (sdk, ...) for testability — SDK instance is injected rather than constructed internally. Types adapted from plan to reflect actual @bagsfm/bags-sdk v1.3.5 exports rather than assumed interfaces. REST fallback paths described in the plan were not implemented since the SDK covers all needed endpoints.\n\n## Known Limitations\n\nNo live API validation — all tests use mocked SDK. Real Bags API behavior (rate limits, error formats, transaction serialization) not yet confirmed. signAndSendClaimTransactions handles VersionedMessage bytes from SDK but hasn't been tested with real Bags API transaction payloads.\n\n## Follow-ups\n\nLive API smoke test with real BAGS_API_KEY needed before S05 integration. Rate limit handling (1000 req/hour per key) not yet implemented at the module level — should be added in S05 when the fund engine coordinates multiple API calls.\n\n## Files Created/Modified\n\n- `package.json` — Added @bagsfm/bags-sdk dependency and bags-fee-share npm script\n- `src/bags/types.ts` — TypeScript interfaces for Bags client config, API responses, fee share admin, update config, claim transactions\n- `src/bags/client.ts` — SDK factory (createBagsClient), API key validation (pingApi), fetchWithTimeout, structured logging, BAGS_API_BASE constant\n- `src/bags/fee-share.ts` — Fee share admin query (getAdminTokenList), claimable positions (getClaimablePositions), config update tx builder (buildUpdateConfigTransaction)\n- `src/bags/fee-claim.ts` — Claim transaction fetcher (getClaimTransactions) and signer/sender (signAndSendClaimTransactions)\n- `tests/bags-client.test.ts` — 14 unit tests for client module — happy paths, timeouts, errors, input validation\n- `tests/bags-fee-share.test.ts` — 28 unit tests for fee-share and fee-claim modules — SDK mock injection, validation, error wrapping\n- `scripts/bags-fee-share.ts` — CLI proof script with --dry-run mode (6 mock response shapes) and live mode with incremental env validation\n- `.env.example` — Added BAGS_API_KEY with comment about dev.bags.fm\n",
+      "full_uat_md": "# S03: Bags SDK Fee Share & Reflection Claiming — UAT\n\n**Milestone:** M001\n**Written:** 2026-04-07T08:29:23.341Z\n\n# S03: Bags SDK Fee Share & Reflection Claiming — UAT\n\n**Milestone:** M001\n**Written:** 2026-04-07\n\n## UAT Type\n\n- UAT mode: artifact-driven\n- Why this mode is sufficient: S03 is a subsystem proof — all Bags SDK interactions are tested via mocked SDK calls and a dry-run CLI script. No live API key or on-chain transactions needed to verify the integration is correctly wired.\n\n## Preconditions\n\n- Node.js 18+ installed\n- `npm install` completed (node_modules present)\n- No env vars required for dry-run verification\n\n## Smoke Test\n\nRun `node node_modules/.bin/tsx scripts/bags-fee-share.ts --dry-run` — should exit 0 and print 6 JSON objects to stdout showing realistic mock responses for all Bags API operations.\n\n## Test Cases\n\n### TC-01: Full test suite passes\n**Steps:**\n1. Run `node node_modules/vitest/vitest.mjs run`\n**Expected:** 79 tests pass across 4 files. Zero failures.\n\n### TC-02: Bags client tests (14 tests)\n**Steps:**\n1. Run `node node_modules/vitest/vitest.mjs run tests/bags-client.test.ts`\n**Expected:** 14 tests pass — pingApi happy path, timeout, non-200, malformed response, createBagsClient instantiation, empty/whitespace API key rejection, structured logging output.\n\n### TC-03: Fee share and claim tests (28 tests)\n**Steps:**\n1. Run `node node_modules/vitest/vitest.mjs run tests/bags-fee-share.test.ts`\n**Expected:** 28 tests pass covering:\n- getAdminTokenList: happy path, empty wallet throws, SDK error wrapping\n- getClaimablePositions: happy path, empty result, SDK error wrapping\n- buildUpdateConfigTransaction: happy path, basis points not summing to 10000 throws before SDK call, empty claimers throws\n- getClaimTransactions: happy path, empty mint throws, SDK error wrapping\n- signAndSendClaimTransactions: mock connection send/confirm, tx signatures returned, timeout handling\n\n### TC-04: Dry-run CLI outputs all 6 response shapes\n**Steps:**\n1. Run `node node_modules/.bin/tsx scripts/bags-fee-share.ts --dry-run`\n2. Parse each stdout line as JSON\n**Expected:** 8 JSON lines total:\n- Line 1: `module: \"bags-fee-share\", phase: \"start\", mode: \"dry-run\"`\n- Line 2: `step: \"ping\"` with mock pong response\n- Line 3: `step: \"getAdminTokenList\"` with array of 2 mock mint addresses\n- Line 4: `step: \"getClaimablePositions\"` with 2 mock position objects (baseMint, claimableAmount, decimals, symbol)\n- Line 5: `step: \"buildUpdateConfigTransaction\"` with mock base64 transaction + blockhash\n- Line 6: `step: \"getClaimTransactions\"` with 2 mock base64 transaction strings\n- Line 7: `step: \"signAndSendClaimTransactions\"` with 2 mock tx signatures\n- Line 8: `module: \"bags-fee-share\", phase: \"complete\", mode: \"dry-run\"`\n\n### TC-05: Live mode rejects missing API key\n**Steps:**\n1. Ensure BAGS_API_KEY is NOT set in environment\n2. Run `node node_modules/.bin/tsx scripts/bags-fee-share.ts` (no --dry-run)\n**Expected:** Exits non-zero with structured JSON error containing `phase` and error message about missing BAGS_API_KEY.\n\n### TC-06: Basis points validation (unit test confirmation)\n**Steps:**\n1. In tests/bags-fee-share.test.ts, confirm test exists for basisPointsArray not summing to 10000\n**Expected:** Test verifies that buildUpdateConfigTransaction throws BEFORE making any SDK call when basis points don't sum to 10000.\n\n### TC-07: SDK installed and npm script registered\n**Steps:**\n1. Run `grep '@bagsfm/bags-sdk' package.json`\n2. Run `grep 'bags-fee-share' package.json`\n3. Run `grep 'BAGS_API_KEY' .env.example`\n**Expected:** All three greps match — SDK in dependencies, npm script registered, env var documented.\n\n### TC-08: No regressions in existing tests\n**Steps:**\n1. Run `node node_modules/vitest/vitest.mjs run tests/debridge-api.test.ts`\n2. Run `node node_modules/vitest/vitest.mjs run tests/solana-tx.test.ts`\n**Expected:** 20 debridge tests pass, 17 solana-tx tests pass. S03 work introduced zero regressions.\n\n## Edge Cases\n\n- **Empty wallet address**: getAdminTokenList, getClaimablePositions, getClaimTransactions all throw with descriptive error before hitting SDK\n- **Invalid mint format**: buildUpdateConfigTransaction validates mint format\n- **Basis points sum != 10000**: Client-side validation prevents SDK call, error message specifies actual sum\n- **SDK constructor failure**: createBagsClient propagates SDK initialization errors with context\n\n## Pass Criteria\n\nAll 8 test cases pass. 79 unit tests green. Dry-run script exits 0 with parseable JSON output. No regressions in existing test files.\n",
       "goal": "Prove Bags SDK can query fee share admin status, update fee share config to redirect claimers to a treasury wallet, and claim accumulated fees — all programmatically via the official SDK and REST API.",
       "success_criteria": "- `npm install` succeeds with `@bagsfm/bags-sdk` added to dependencies\n- `npx vitest run tests/bags-client.test.ts` passes — SDK client instantiation, API key validation, ping mock\n- `npx vitest run tests/bags-fee-share.test.ts` passes — admin list query, config update transaction building, claimable position querying, claim transaction building, error handling for all endpoints\n- `scripts/bags-fee-share.ts` executes without errors in `--dry-run` mode, producing structured JSON output showing: admin list query result, claimable positions query result, and transaction payloads ready for signing\n- All modules use structured JSON logging matching the `src/debridge/api.ts` pattern (greppable by module/phase/action)\n- Rate limit headers (`X-RateLimit-Remaining`, `X-RateLimit-Reset`) are captured and logged",
       "proof_level": "Contract-level proof with real API integration available. Unit tests mock all network calls. The CLI script can exercise real Bags.fm API when `BAGS_API_KEY` is set, or dry-run with mocked responses when not.",
@@ -152,11 +152,11 @@
       "completed_at": null,
       "full_summary_md": "",
       "full_uat_md": "",
-      "goal": "Prove Jupiter swaps and Solana holder resolution work",
-      "success_criteria": "Swap completes and holder list resolved",
-      "proof_level": "integration",
-      "integration_closure": "Jupiter and holder modules reusable",
-      "observability_impact": "Swap tx hash and holder list",
+      "goal": "Prove Jupiter SOL→USDC swap and top-100 holder resolution as independent subsystem modules with unit tests and CLI proof scripts.",
+      "success_criteria": "- `npx vitest run` passes all tests including `tests/jupiter-swap.test.ts` and `tests/holder-resolution.test.ts`\n- `npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000` returns a valid quote without error\n- `npx tsx scripts/resolve-holders.ts --mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v --count 20` returns 20 holders sorted by descending amount with percentages",
+      "proof_level": "contract + integration (mocked unit tests prove module contracts; CLI scripts prove live API integration)",
+      "integration_closure": "- Upstream surfaces consumed: `src/config/solana.ts` (connection factory, known addresses), `@solana/web3.js` (VersionedTransaction, Connection, Keypair)\n- New wiring introduced: `src/jupiter/` and `src/holders/` modules, `scripts/jupiter-swap.ts` and `scripts/resolve-holders.ts` CLI scripts, new npm scripts in `package.json`\n- What remains before milestone is truly usable end-to-end: S05 (data model) and S06 (outbound integration) wire these modules into the pipeline",
+      "observability_impact": "- Runtime signals: Structured JSON logging with module/phase/action fields in both Jupiter and holder modules (follows deBridge pattern)\n- Inspection surfaces: CLI scripts (`jupiter-swap.ts --estimate-only`, `resolve-holders.ts`) for ad-hoc testing\n- Failure visibility: Typed errors with context (API status codes, timeout durations, RPC error messages) logged as structured JSON\n- Redaction constraints: SOL_PRIVATE_KEY never logged (established pattern in solana.ts)",
       "sequence": 0,
       "replan_triggered_at": null
     },
@@ -587,6 +587,106 @@
       "observability_impact": "",
       "full_plan_md": "",
       "sequence": 0
+    },
+    {
+      "milestone_id": "M001",
+      "slice_id": "S04",
+      "id": "T01",
+      "title": "Built Jupiter Ultra V3 swap module with 24 passing unit tests and live CLI estimate proving 0.01 SOL → 0.80 USDC quote via Jupiter API",
+      "status": "complete",
+      "one_liner": "Built Jupiter Ultra V3 swap module with 24 passing unit tests and live CLI estimate proving 0.01 SOL → 0.80 USDC quote via Jupiter API",
+      "narrative": "Created the Jupiter swap subsystem following the deBridge pattern: types file (JupiterOrderRequest/Response, JupiterExecuteRequest/Response, SwapResult), API module with structured logging, fetchWithTimeout, input validation, and three exported functions (getSwapOrder, executeSwap, swapSolToUsdc). Added WRAPPED_SOL and SPL_TOKEN_PROGRAM_ID constants to solana config. Built 24 unit tests covering happy paths, malformed inputs (zero/negative/NaN amounts, empty addresses), HTTP error codes (400, 429, 500), network timeout, malformed responses, and full orchestration flow. Created CLI proof script with --estimate-only and --amount flags. Live API test confirmed 0.01 SOL → 0.80 USDC quote. Discovered Jupiter returns quote data even with empty transaction for insufficient-funds takers — adapted validation accordingly.",
+      "verification_result": "npx vitest run tests/jupiter-swap.test.ts → 24/24 passed. npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000 → exit 0, returned 0.01 SOL → 0.800419 USDC quote from live Jupiter API.",
+      "duration": "",
+      "completed_at": "2026-04-07T08:43:43.612Z",
+      "blocker_discovered": false,
+      "deviations": "Relaxed getSwapOrder response validation: Jupiter Ultra returns empty transaction string with valid quote data when taker has insufficient funds. Adapted to require requestId + at least one of transaction or inAmount. Used MessageV0 constructor instead of raw bytes for test mock VersionedTransaction.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/jupiter/types.ts",
+        "src/jupiter/swap.ts",
+        "tests/jupiter-swap.test.ts",
+        "scripts/jupiter-swap.ts",
+        "src/config/solana.ts",
+        "package.json"
+      ],
+      "key_decisions": [
+        "Relaxed getSwapOrder validation to accept responses with inAmount but no transaction, supporting estimate-only mode with dummy taker addresses"
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S04\nmilestone: M001\nkey_files:\n  - src/jupiter/types.ts\n  - src/jupiter/swap.ts\n  - tests/jupiter-swap.test.ts\n  - scripts/jupiter-swap.ts\n  - src/config/solana.ts\n  - package.json\nkey_decisions:\n  - Relaxed getSwapOrder validation to accept responses with inAmount but no transaction, supporting estimate-only mode with dummy taker addresses\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T08:43:43.611Z\nblocker_discovered: false\n---\n\n# T01: Built Jupiter Ultra V3 swap module with 24 passing unit tests and live CLI estimate proving 0.01 SOL → 0.80 USDC quote via Jupiter API\n\n**Built Jupiter Ultra V3 swap module with 24 passing unit tests and live CLI estimate proving 0.01 SOL → 0.80 USDC quote via Jupiter API**\n\n## What Happened\n\nCreated the Jupiter swap subsystem following the deBridge pattern: types file (JupiterOrderRequest/Response, JupiterExecuteRequest/Response, SwapResult), API module with structured logging, fetchWithTimeout, input validation, and three exported functions (getSwapOrder, executeSwap, swapSolToUsdc). Added WRAPPED_SOL and SPL_TOKEN_PROGRAM_ID constants to solana config. Built 24 unit tests covering happy paths, malformed inputs (zero/negative/NaN amounts, empty addresses), HTTP error codes (400, 429, 500), network timeout, malformed responses, and full orchestration flow. Created CLI proof script with --estimate-only and --amount flags. Live API test confirmed 0.01 SOL → 0.80 USDC quote. Discovered Jupiter returns quote data even with empty transaction for insufficient-funds takers — adapted validation accordingly.\n\n## Verification\n\nnpx vitest run tests/jupiter-swap.test.ts → 24/24 passed. npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000 → exit 0, returned 0.01 SOL → 0.800419 USDC quote from live Jupiter API.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/jupiter-swap.test.ts` | 0 | ✅ pass | 3150ms |\n| 2 | `npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000` | 0 | ✅ pass | 9300ms |\n\n## Deviations\n\nRelaxed getSwapOrder response validation: Jupiter Ultra returns empty transaction string with valid quote data when taker has insufficient funds. Adapted to require requestId + at least one of transaction or inAmount. Used MessageV0 constructor instead of raw bytes for test mock VersionedTransaction.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/jupiter/types.ts`\n- `src/jupiter/swap.ts`\n- `tests/jupiter-swap.test.ts`\n- `scripts/jupiter-swap.ts`\n- `src/config/solana.ts`\n- `package.json`\n",
+      "description": "Create the Jupiter swap subsystem that proves R004 (swap SOL reflections to USDC via Jupiter). Follows the established deBridge pattern: types file → API module with structured logging and fetchWithTimeout → unit tests with mocked fetch → CLI proof script with --estimate-only and --amount flags.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Jupiter Ultra V3 API (`api.jup.ag`) | Throw with HTTP status + response body | AbortController timeout after 15s, throw descriptive error | Validate response shape before returning, throw on missing `transaction` or `requestId` fields |\n| Solana RPC (for VersionedTransaction) | Not called during order/execute — Jupiter handles submission | N/A for module (Jupiter manages RPC internally) | N/A |\n\n## Negative Tests\n\n- **Malformed inputs**: zero amount, negative amount, empty mint address, non-base58 address\n- **Error paths**: HTTP 400 (bad request), HTTP 429 (rate limit), HTTP 500 (server error), network timeout, response missing required fields\n- **Boundary conditions**: minimum swap amount, amount as string vs number\n\n## Steps\n\n1. Add `WRAPPED_SOL` mint address and `SPL_TOKEN_PROGRAM_ID` to `SOLANA_KNOWN_ADDRESSES` in `src/config/solana.ts`\n2. Create `src/jupiter/types.ts` with TypeScript interfaces: `JupiterOrderRequest`, `JupiterOrderResponse` (contains `transaction` base64 string, `requestId`, type/inputMint/outputMint/inAmount/outAmount), `JupiterExecuteRequest`, `JupiterExecuteResponse` (contains `status`, `signature`, `error`)\n3. Create `src/jupiter/swap.ts` with:\n   - `log()` structured logger (module: 'jupiter')\n   - `fetchWithTimeout()` (same pattern as deBridge)\n   - `getSwapOrder(inputMint, outputMint, amount, taker)` → calls `GET /ultra/v1/order` with query params, returns `JupiterOrderResponse`\n   - `executeSwap(signedTransaction, requestId)` → calls `POST /ultra/v1/execute` with JSON body `{signedTransaction, requestId}`, returns `JupiterExecuteResponse`\n   - `swapSolToUsdc(amountLamports, wallet, connection)` → high-level helper: getSwapOrder → deserialize base64 VersionedTransaction → sign with wallet → serialize to base64 → executeSwap. Returns `{signature, inAmount, outAmount}`\n   - Input validation on all public functions (amount > 0, valid addresses)\n   - **Critical**: Jupiter returns base64-encoded VersionedTransaction. Do NOT inject ComputeBudget instructions (Jupiter handles internally). Sign as-is.\n4. Create `tests/jupiter-swap.test.ts` with mocked fetch:\n   - Test `getSwapOrder` builds correct URL and parses response\n   - Test `executeSwap` sends correct POST body and parses response\n   - Test input validation (zero amount, empty address)\n   - Test error handling (HTTP 400, 500, timeout, malformed response)\n   - Test `swapSolToUsdc` orchestration with mocked order + execute\n5. Create `scripts/jupiter-swap.ts` CLI proof script:\n   - `--estimate-only` mode: calls `getSwapOrder` and prints quote (no wallet needed)\n   - `--amount <lamports>` flag (default: 10000000 = 0.01 SOL)\n   - Full swap mode: requires `SOL_PRIVATE_KEY` env var, calls `swapSolToUsdc`\n   - Structured logging + human-readable summary output\n6. Add `jupiter-swap` and `jupiter-estimate` scripts to `package.json`",
+      "estimate": "1h",
+      "files": [
+        "src/config/solana.ts",
+        "src/jupiter/types.ts",
+        "src/jupiter/swap.ts",
+        "tests/jupiter-swap.test.ts",
+        "scripts/jupiter-swap.ts",
+        "package.json"
+      ],
+      "verify": "npx vitest run tests/jupiter-swap.test.ts && npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000",
+      "inputs": [
+        "`src/config/solana.ts` — existing Solana connection factory and USDC address constant",
+        "`src/debridge/api.ts` — reference pattern for structured logging, fetchWithTimeout, input validation",
+        "`src/debridge/types.ts` — reference pattern for TypeScript API type definitions",
+        "`scripts/bridge-sol-to-base.ts` — reference pattern for CLI proof script with --estimate-only flag",
+        "`tests/debridge-api.test.ts` — reference pattern for mocked fetch unit tests"
+      ],
+      "expected_output": [
+        "`src/jupiter/types.ts` — Jupiter Ultra V3 API type definitions",
+        "`src/jupiter/swap.ts` — Jupiter swap module with getSwapOrder, executeSwap, swapSolToUsdc",
+        "`tests/jupiter-swap.test.ts` — Unit tests with mocked fetch for all Jupiter functions",
+        "`scripts/jupiter-swap.ts` — CLI proof script with --estimate-only and full swap modes",
+        "`src/config/solana.ts` — Updated with WRAPPED_SOL and SPL_TOKEN_PROGRAM_ID constants",
+        "`package.json` — Updated with jupiter-swap and jupiter-estimate npm scripts"
+      ],
+      "observability_impact": "Structured JSON logs with module:'jupiter', phase/action fields. Errors include HTTP status, response body excerpt, and timeout duration. CLI script outputs human-readable summary alongside JSON logs.",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M001",
+      "slice_id": "S04",
+      "id": "T02",
+      "title": "Build holder resolution module with dual-strategy RPC, unit tests, and CLI script",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Create the holder resolution subsystem that proves R013 (query top 100 holders of any SPL token mint). Implements two strategies: `getProgramAccounts` with SPL Token filters (universal fallback) and Helius DAS `getTokenAccounts` (preferred when Helius RPC detected). Returns sorted holder list with owner addresses, amounts, and percentage shares.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Solana RPC `getProgramAccounts` | Throw with RPC error message and code | Connection timeout (60s default), throw descriptive error | Validate account data length is 165 bytes, skip malformed accounts with warning log |\n| Helius DAS `getTokenAccounts` | Fall back to `getProgramAccounts` strategy with warning log | Fall back to `getProgramAccounts` strategy | Validate response has `token_accounts` array, fall back on unexpected shape |\n\n## Negative Tests\n\n- **Malformed inputs**: empty mint address, invalid base58 mint, count of 0, count > 10000\n- **Error paths**: RPC connection refused, getProgramAccounts disabled (HTTP 403/410), Helius 429 rate limit, malformed account data (< 165 bytes)\n- **Boundary conditions**: token with 0 holders, token with < count holders, zero-balance accounts filtered, count=1\n\n## Steps\n\n1. Create `src/holders/types.ts` with:\n   - `HolderInfo` interface: `{ owner: string; amount: bigint; percentage: number }`\n   - `HolderResolutionResult` interface: `{ holders: HolderInfo[]; totalSupplyHeld: bigint; strategy: 'helius-das' | 'getProgramAccounts'; mint: string }`\n2. Create `src/holders/resolve.ts` with:\n   - `log()` structured logger (module: 'holders')\n   - `isHeliusRpc(url)` — detect Helius RPC from URL (contains 'helius')\n   - `resolveHoldersViaProgramAccounts(connection, mint, count)` — calls `connection.getProgramAccounts()` with SPL Token program ID, dataSize filter (165), memcmp filter at offset 0 for mint bytes. Parse each account: owner at bytes 32-63, amount at bytes 64-71 (u64 LE via `Buffer.readBigUInt64LE(64)`). Filter zero-balance. Sort descending. Take top `count`. Calculate percentage shares.\n   - `resolveHoldersViaHelius(rpcUrl, mint, count)` — calls Helius DAS `getTokenAccounts` with mint filter, paginated (limit 1000 per page). Parse owner + amount. Sort descending. Take top `count`. Calculate percentages.\n   - `getTopHolders(mint, count, connection?)` — main entry: if Helius detected, try Helius first with fallback to getProgramAccounts. Otherwise use getProgramAccounts directly. Input validation on mint (non-empty, 32-44 chars base58) and count (1-10000).\n   - **Critical**: SPL Token account layout is 165 bytes. Mint at offset 0 (32 bytes), owner at offset 32 (32 bytes), amount at offset 64 (8 bytes u64 LE). Filter out zero-balance accounts before sorting.\n3. Create `tests/holder-resolution.test.ts` with mocked RPC:\n   - Test `resolveHoldersViaProgramAccounts` parses account data correctly (craft Buffer with known mint/owner/amount)\n   - Test sorting is descending by amount\n   - Test percentage calculation sums to ~100% (within rounding)\n   - Test zero-balance accounts are filtered\n   - Test count limiting (request 5, get 5 even if more exist)\n   - Test input validation (empty mint, count=0)\n   - Test `isHeliusRpc` detection\n   - Test fallback from Helius to getProgramAccounts on error\n4. Create `scripts/resolve-holders.ts` CLI proof script:\n   - `--mint <address>` flag (required)\n   - `--count <N>` flag (default: 100)\n   - Uses `SOL_RPC_URL` env var (defaults to public mainnet)\n   - Outputs table: rank, owner address (truncated), amount, percentage\n   - Structured logging + human-readable summary\n5. Add `resolve-holders` script to `package.json`",
+      "estimate": "1h",
+      "files": [
+        "src/holders/types.ts",
+        "src/holders/resolve.ts",
+        "tests/holder-resolution.test.ts",
+        "scripts/resolve-holders.ts",
+        "package.json"
+      ],
+      "verify": "npx vitest run tests/holder-resolution.test.ts && npx tsx scripts/resolve-holders.ts --mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v --count 20",
+      "inputs": [
+        "`src/config/solana.ts` — Solana connection factory, USDC address for test mint, WRAPPED_SOL and SPL_TOKEN_PROGRAM_ID from T01",
+        "`src/debridge/api.ts` — reference pattern for structured logging",
+        "`tests/debridge-api.test.ts` — reference pattern for mocked RPC unit tests",
+        "`scripts/bridge-sol-to-base.ts` — reference pattern for CLI proof script"
+      ],
+      "expected_output": [
+        "`src/holders/types.ts` — HolderInfo and HolderResolutionResult type definitions",
+        "`src/holders/resolve.ts` — Dual-strategy holder resolution module with getTopHolders entry point",
+        "`tests/holder-resolution.test.ts` — Unit tests with mocked RPC for holder parsing, sorting, percentages, fallback",
+        "`scripts/resolve-holders.ts` — CLI proof script with --mint and --count flags",
+        "`package.json` — Updated with resolve-holders npm script"
+      ],
+      "observability_impact": "Structured JSON logs with module:'holders', including strategy used, account count, timing. Helius fallback logged as warning. RPC errors include endpoint URL (not key) and error code.",
+      "full_plan_md": "",
+      "sequence": 0
     }
   ],
   "decisions": [
@@ -877,6 +977,18 @@
       "revisable": "Yes — if SDK proves unreliable or lags behind API changes, switch to pure REST",
       "made_by": "agent",
       "superseded_by": null
+    },
+    {
+      "seq": 25,
+      "id": "D025",
+      "when_context": "",
+      "scope": "M001/S03",
+      "decision": "Bags SDK function signature pattern — SDK instance injection vs API key string",
+      "choice": "All fee-share and fee-claim functions accept a BagsSDK instance as first parameter rather than raw API key string",
+      "rationale": "Enables mock injection in tests without globalThis.fetch patching. The SDK manages connection, auth, and program interactions internally — passing the instance preserves this encapsulation while making every function trivially testable. 28 tests use this pattern successfully.",
+      "revisable": "Yes",
+      "made_by": "agent",
+      "superseded_by": null
     }
   ],
   "verification_evidence": [
@@ -1055,6 +1167,28 @@
       "verdict": "✅ pass",
       "duration_ms": 100,
       "created_at": "2026-04-07T08:26:58.679Z"
+    },
+    {
+      "id": 17,
+      "task_id": "T01",
+      "slice_id": "S04",
+      "milestone_id": "M001",
+      "command": "npx vitest run tests/jupiter-swap.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3150,
+      "created_at": "2026-04-07T08:43:43.612Z"
+    },
+    {
+      "id": 18,
+      "task_id": "T01",
+      "slice_id": "S04",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 9300,
+      "created_at": "2026-04-07T08:43:43.612Z"
     }
   ]
 }
