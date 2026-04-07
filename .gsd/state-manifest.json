@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T18:59:40.749Z",
+  "exported_at": "2026-04-07T19:04:03.490Z",
   "milestones": [
     {
       "id": "M001",
@@ -1580,19 +1580,26 @@
       "milestone_id": "M002",
       "slice_id": "S03",
       "id": "T02",
-      "title": "Build emergency stables and revert module with tests",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built emergencyStables() and emergencyRevert() in src/alvara/emergency.ts with 16 passing unit tests — snapshot-based emergency conversion to 95% USDT + 5% ALVA and revert to original composition",
+      "status": "complete",
+      "one_liner": "Built emergencyStables() and emergencyRevert() in src/alvara/emergency.ts with 16 passing unit tests — snapshot-based emergency conversion to 95% USDT + 5% ALVA and revert to original composition",
+      "narrative": "Created src/alvara/emergency.ts with two functions wrapping rebalanceBSKT() from T01. emergencyStables() reads current composition, snapshots it, builds emergency target [USDT, ALVA] at [9500, 500] bps, calls rebalanceBSKT with EMERGENCY_STABLES mode. emergencyRevert() takes a snapshot, validates it, converts bigint weights to numbers, calls rebalanceBSKT with REVERT_EMERGENCY mode. Both functions validate inputs, log with module: 'alvara-emergency', and support dry-run via the underlying rebalanceBSKT(). Built 16 unit tests covering happy path, validation, dry-run propagation, and error propagation for both functions.",
+      "verification_result": "Ran combined test suite: npx vitest run tests/alvara-emergency.test.ts tests/alvara-rebalance.test.ts — 30 tests pass (16 emergency + 14 rebalance), zero regressions.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T19:04:03.405Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/alvara/emergency.ts",
+        "tests/alvara-emergency.test.ts"
+      ],
+      "key_decisions": [
+        "Emergency module wraps rebalanceBSKT() rather than duplicating tx logic",
+        "Event token validation is a warning log not a throw",
+        "Snapshot tokens/weights length mismatch validated before revert"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S03\nmilestone: M002\nkey_files:\n  - src/alvara/emergency.ts\n  - tests/alvara-emergency.test.ts\nkey_decisions:\n  - Emergency module wraps rebalanceBSKT() rather than duplicating tx logic\n  - Event token validation is a warning log not a throw\n  - Snapshot tokens/weights length mismatch validated before revert\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:04:03.405Z\nblocker_discovered: false\n---\n\n# T02: Built emergencyStables() and emergencyRevert() in src/alvara/emergency.ts with 16 passing unit tests — snapshot-based emergency conversion to 95% USDT + 5% ALVA and revert to original composition\n\n**Built emergencyStables() and emergencyRevert() in src/alvara/emergency.ts with 16 passing unit tests — snapshot-based emergency conversion to 95% USDT + 5% ALVA and revert to original composition**\n\n## What Happened\n\nCreated src/alvara/emergency.ts with two functions wrapping rebalanceBSKT() from T01. emergencyStables() reads current composition, snapshots it, builds emergency target [USDT, ALVA] at [9500, 500] bps, calls rebalanceBSKT with EMERGENCY_STABLES mode. emergencyRevert() takes a snapshot, validates it, converts bigint weights to numbers, calls rebalanceBSKT with REVERT_EMERGENCY mode. Both functions validate inputs, log with module: 'alvara-emergency', and support dry-run via the underlying rebalanceBSKT(). Built 16 unit tests covering happy path, validation, dry-run propagation, and error propagation for both functions.\n\n## Verification\n\nRan combined test suite: npx vitest run tests/alvara-emergency.test.ts tests/alvara-rebalance.test.ts — 30 tests pass (16 emergency + 14 rebalance), zero regressions.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/alvara-emergency.test.ts` | 0 | ✅ pass | 18860ms |\n| 2 | `npx vitest run tests/alvara-rebalance.test.ts` | 0 | ✅ pass | 8090ms |\n| 3 | `npx vitest run tests/alvara-emergency.test.ts tests/alvara-rebalance.test.ts` | 0 | ✅ pass | 15920ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/alvara/emergency.ts`\n- `tests/alvara-emergency.test.ts`\n",
       "description": "Build src/alvara/emergency.ts wrapping rebalanceBSKT() from T01 with emergency-specific logic.\n\nTwo functions:\n\n1. **emergencyStables(opts)** — converts BSKT to ~95% USDT + 5% ALVA:\n   - Read current composition via getConstituents() → store as snapshot (returned to caller)\n   - Compute emergency target: [USDT, ALVA] with weights [9500, 500] bps\n   - Call rebalanceBSKT() with emergency targets\n   - Validate BSKTRebalanced event shows expected target tokens\n   - Return { snapshot: ConstituentInfo, rebalanceResult: RebalanceResult }\n\n2. **emergencyRevert(opts)** — restores original composition:\n   - Accept original composition (ConstituentInfo) as parameter\n   - Call rebalanceBSKT() with original tokens/weights\n   - Validate BSKTRebalanced event shows restoration\n   - Return RebalanceResult\n\nKey design points:\n- USDT address from KNOWN_ADDRESSES in chains.ts (added in T01)\n- ALVA address from KNOWN_ADDRESSES in chains.ts (already exists)\n- Emergency weights are constants: EMERGENCY_USDT_WEIGHT = 9500, EMERGENCY_ALVA_WEIGHT = 500\n- Validate weights sum to 10000 before calling\n- Validate snapshot has at least one token before revert\n- In-memory/parameter-based state tracking (S05 will persist to DB later)\n- Structured JSON logging with module: 'alvara-emergency'\n- Both functions support dry-run via the underlying rebalanceBSKT()\n\nBuild tests/alvara-emergency.test.ts:\n- Mock rebalance.js (rebalanceBSKT) and erc7621.js (getConstituents)\n- Happy path: emergency converts to USDT+ALVA, snapshot returned\n- Happy path: revert restores original composition\n- Validation: empty snapshot revert throws\n- Dry-run propagation: emergency and revert both support dry-run\n- Error propagation: rebalanceBSKT failure surfaces correctly",
       "estimate": "1h",
       "files": [
@@ -2679,6 +2686,39 @@
       "verdict": "✅ pass",
       "duration_ms": 14200,
       "created_at": "2026-04-07T18:59:40.640Z"
+    },
+    {
+      "id": 57,
+      "task_id": "T02",
+      "slice_id": "S03",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/alvara-emergency.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 18860,
+      "created_at": "2026-04-07T19:04:03.405Z"
+    },
+    {
+      "id": 58,
+      "task_id": "T02",
+      "slice_id": "S03",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/alvara-rebalance.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 8090,
+      "created_at": "2026-04-07T19:04:03.405Z"
+    },
+    {
+      "id": 59,
+      "task_id": "T02",
+      "slice_id": "S03",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/alvara-emergency.test.ts tests/alvara-rebalance.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 15920,
+      "created_at": "2026-04-07T19:04:03.405Z"
     }
   ]
 }
