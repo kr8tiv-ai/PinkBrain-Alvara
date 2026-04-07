@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T18:39:35.515Z",
+  "exported_at": "2026-04-07T18:44:24.946Z",
   "milestones": [
     {
       "id": "M001",
@@ -1473,19 +1473,30 @@
       "milestone_id": "M002",
       "slice_id": "S02",
       "id": "T04",
-      "title": "Accumulation scheduler worker and CLI entry point",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built accumulation scheduler worker with BullMQ, fund polling, concurrency guards, CLI entry point, and 9 tests",
+      "status": "complete",
+      "one_liner": "Built accumulation scheduler worker with BullMQ, fund polling, concurrency guards, CLI entry point, and 9 tests",
+      "narrative": "Created src/scheduler/accumulation-worker.ts with createAccumulationWorker() factory — BullMQ Worker that scans active funds, checks SOL balance against threshold, enforces concurrency guard (skips if active pipeline run exists), dispatches runOutboundPipeline(). Per-fund errors isolated. Added updateFundLastPipelineRun() to fund-repository. Created scripts/start-scheduler.ts CLI entry point with --cron flag (default: every 6 hours), upsertJobScheduler for cron, and SIGINT/SIGTERM graceful shutdown. 9 tests cover dispatch, all skip conditions, error isolation, and call ordering. Full suite: 250 pass, 28 skipped, 0 regressions.",
+      "verification_result": "npx vitest run tests/accumulation-scheduler.test.ts — 9 tests pass. npx vitest run — 250 tests pass, 28 skipped, zero regressions.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T18:44:24.871Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/scheduler/accumulation-worker.ts",
+        "src/scheduler/index.ts",
+        "src/db/fund-repository.ts",
+        "scripts/start-scheduler.ts",
+        "tests/accumulation-scheduler.test.ts",
+        "package.json"
+      ],
+      "key_decisions": [
+        "Used SkipFund sentinel error to separate skip-counting from error-counting",
+        "Mocked BullMQ Worker constructor to capture processor function, avoiding real Redis dependency in tests",
+        "CLI uses upsertJobScheduler (not deprecated addRepeatableJob) for cron scheduling"
+      ],
+      "full_summary_md": "---\nid: T04\nparent: S02\nmilestone: M002\nkey_files:\n  - src/scheduler/accumulation-worker.ts\n  - src/scheduler/index.ts\n  - src/db/fund-repository.ts\n  - scripts/start-scheduler.ts\n  - tests/accumulation-scheduler.test.ts\n  - package.json\nkey_decisions:\n  - Used SkipFund sentinel error to separate skip-counting from error-counting\n  - Mocked BullMQ Worker constructor to capture processor function, avoiding real Redis dependency in tests\n  - CLI uses upsertJobScheduler (not deprecated addRepeatableJob) for cron scheduling\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T18:44:24.871Z\nblocker_discovered: false\n---\n\n# T04: Built accumulation scheduler worker with BullMQ, fund polling, concurrency guards, CLI entry point, and 9 tests\n\n**Built accumulation scheduler worker with BullMQ, fund polling, concurrency guards, CLI entry point, and 9 tests**\n\n## What Happened\n\nCreated src/scheduler/accumulation-worker.ts with createAccumulationWorker() factory — BullMQ Worker that scans active funds, checks SOL balance against threshold, enforces concurrency guard (skips if active pipeline run exists), dispatches runOutboundPipeline(). Per-fund errors isolated. Added updateFundLastPipelineRun() to fund-repository. Created scripts/start-scheduler.ts CLI entry point with --cron flag (default: every 6 hours), upsertJobScheduler for cron, and SIGINT/SIGTERM graceful shutdown. 9 tests cover dispatch, all skip conditions, error isolation, and call ordering. Full suite: 250 pass, 28 skipped, 0 regressions.\n\n## Verification\n\nnpx vitest run tests/accumulation-scheduler.test.ts — 9 tests pass. npx vitest run — 250 tests pass, 28 skipped, zero regressions.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/accumulation-scheduler.test.ts` | 0 | ✅ pass | 13100ms |\n| 2 | `npx vitest run` | 0 | ✅ pass | 42600ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/scheduler/accumulation-worker.ts`\n- `src/scheduler/index.ts`\n- `src/db/fund-repository.ts`\n- `scripts/start-scheduler.ts`\n- `tests/accumulation-scheduler.test.ts`\n- `package.json`\n",
       "description": "Build the BullMQ accumulation worker that polls active funds, checks SOL balance against threshold, dispatches pipeline runs with concurrency guards, and a CLI entry point with graceful shutdown.\n\n## Why\nThis is the top-level orchestration that makes the pipeline automatic (R003). Without the scheduler, the pipeline only runs when manually invoked. The scheduler closes the slice demo: seed a fund → scheduler detects balance → pipeline fires → BSKT gets contribution.\n\n## Steps\n1. Create `src/scheduler/accumulation-worker.ts`:\n   - Export `createAccumulationWorker(opts: { db, connection, ... })` returning a BullMQ Worker.\n   - Worker processes jobs from the accumulation queue.\n   - Job handler:\n     a. Query `listFunds(db, { status: 'active' })`.\n     b. For each fund with `accumulationThresholdLamports` set:\n        - Get fund's Solana treasury wallet from `getFundWallets()`.\n        - Check SOL balance via `connection.getBalance()`.\n        - If balance > threshold AND `getActivePipelineRuns(db, fundId)` returns empty:\n          - Call `runOutboundPipeline()` (or `resumeOutboundPipeline()` if a failed run exists for this fund).\n          - Update `lastPipelineRunAt` on the fund via a new `updateFundLastPipelineRun(db, fundId)` helper in fund-repository.\n        - If active run exists, log skip reason.\n        - If balance < threshold, log skip reason.\n     c. Catch per-fund errors — log and continue to next fund. One fund's failure doesn't block others.\n   - Use structured logging: `{ ts, module: 'scheduler', action: 'checkFund' | 'dispatchPipeline' | 'skipFund', fundId, reason?, ... }`.\n\n2. Add `updateFundLastPipelineRun(db, fundId)` to `src/db/fund-repository.ts` — updates `lastPipelineRunAt` to now.\n\n3. Create `scripts/start-scheduler.ts`:\n   - Parse `--cron` flag (default: '0 */6 * * *' for every 6 hours per D009).\n   - Call `upsertJobScheduler()` on the accumulation queue to register the cron.\n   - Create the worker via `createAccumulationWorker()`.\n   - Register SIGINT/SIGTERM handlers for graceful shutdown: `await worker.close(); await closeRedis(); await closeDb(); process.exit(0);`.\n   - Add to package.json scripts: `\"scheduler\": \"tsx scripts/start-scheduler.ts\"`.\n\n4. Write `tests/accumulation-scheduler.test.ts`:\n   - Mock: `src/db/fund-repository.ts`, `@solana/web3.js` Connection.getBalance, `src/pipeline/outbound.ts`.\n   - Test: worker dispatches pipeline when fund balance > threshold and no active runs.\n   - Test: worker skips fund when balance < threshold.\n   - Test: worker skips fund when active pipeline run exists (concurrency guard).\n   - Test: worker skips fund with no Solana treasury wallet.\n   - Test: per-fund error doesn't crash the worker (other funds still processed).\n   - Test: worker calls updateFundLastPipelineRun after successful dispatch.\n   - Test: worker skips fund with no accumulationThresholdLamports set.\n\n5. Verify all tests pass: full test suite.\n\n## Failure Modes\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Solana RPC (getBalance) | Log error, skip fund | 10s timeout, skip fund | Validate numeric response |\n| DB (listFunds) | Log error, exit job (retry next cron) | 10s timeout | N/A (typed) |\n| Pipeline dispatch | Log error per fund, continue to next | Pipeline has its own timeouts | N/A |\n| Redis (BullMQ) | Worker reconnects automatically | BullMQ handles reconnection | N/A |\n\n## Load Profile\n- Shared resources: DB connection pool (shared with pipeline), Redis connection (BullMQ managed), Solana RPC\n- Per-operation cost: 1 DB query (listFunds) + N getBalance calls + N getActivePipelineRuns queries where N = active fund count\n- 10x breakpoint: At 100+ funds, sequential balance checks may exceed cron interval. Mitigation: batch RPC calls or parallelize with concurrency limit. Not a concern for initial deployment (< 10 funds).\n\n## Negative Tests\n- Empty fund list → job completes with no errors\n- All funds below threshold → job completes, logs skip reasons\n- Fund with null accumulationThresholdLamports → skipped\n- Fund with no Solana wallet → skipped with warning",
       "estimate": "1h30m",
       "files": [
@@ -2498,6 +2509,28 @@
       "verdict": "✅ pass",
       "duration_ms": 60000,
       "created_at": "2026-04-07T18:39:35.418Z"
+    },
+    {
+      "id": 53,
+      "task_id": "T04",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/accumulation-scheduler.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 13100,
+      "created_at": "2026-04-07T18:44:24.872Z"
+    },
+    {
+      "id": 54,
+      "task_id": "T04",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "npx vitest run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 42600,
+      "created_at": "2026-04-07T18:44:24.872Z"
     }
   ]
 }

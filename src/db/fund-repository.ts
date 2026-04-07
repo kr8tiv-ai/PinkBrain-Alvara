@@ -122,6 +122,22 @@ export async function updateFundBsktAddress(
   return updated;
 }
 
+export async function updateFundLastPipelineRun(
+  db: AppDb,
+  id: string,
+): Promise<Fund> {
+  const [updated] = await db
+    .update(funds)
+    .set({ lastPipelineRunAt: new Date(), updatedAt: new Date() })
+    .where(eq(funds.id, id))
+    .returning();
+
+  if (!updated) throw new FundNotFound(id);
+
+  log('updateFundLastPipelineRun', { fundId: id, at: updated.lastPipelineRunAt?.toISOString() });
+  return updated;
+}
+
 // ── Wallets ─────────────────────────────────────────────────────────────
 
 export async function setFundWallets(

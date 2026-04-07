@@ -16,7 +16,8 @@
     "jupiter-estimate": "tsx scripts/jupiter-swap.ts --estimate-only",
     "resolve-holders": "tsx scripts/resolve-holders.ts",
     "db-seed": "tsx scripts/db-seed.ts",
-    "outbound-pipeline": "tsx scripts/outbound-pipeline.ts"
+    "outbound-pipeline": "tsx scripts/outbound-pipeline.ts",
+    "scheduler": "tsx scripts/start-scheduler.ts"
   },
   "dependencies": {
     "@bagsfm/bags-sdk": "^1.3.5",
