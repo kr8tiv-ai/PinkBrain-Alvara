@@ -377,18 +377,18 @@ describe('runOutboundPipeline', () => {
       const conn = setupHappyPath();
       await runOutboundPipeline(makeOpts(conn));
 
-      // updatePipelineRun(db, runId, updates) — updates at index [2]
+      // updatePipelineRun(db, runId, updates) — filter to phase/status updates,
+      // ignoring checkpoint metadata writes
       const calls = mUpdatePipelineRun.mock.calls;
+      const phaseCalls = calls.filter((c) => c[2]?.phase || c[2]?.status);
 
-      // First call: phase → swapping
-      expect(calls[0][2]).toEqual({ phase: 'swapping' });
+      // Phase transitions: swapping → bridging → completed
+      expect(phaseCalls[0][2]).toMatchObject({ phase: 'swapping' });
+      expect(phaseCalls[1][2]).toMatchObject({ phase: 'bridging' });
 
-      // Second call: phase → bridging
-      expect(calls[1][2]).toEqual({ phase: 'bridging' });
-
-      // Third call: completed
-      expect(calls[2][2]).toMatchObject({ status: 'completed' });
-      expect(calls[2][2]).toHaveProperty('completedAt');
+      const completedCall = phaseCalls.find((c) => c[2]?.status === 'completed');
+      expect(completedCall).toBeDefined();
+      expect(completedCall![2]).toHaveProperty('completedAt');
     });
 
     it('creates initial pipeline run with claiming phase', async () => {

@@ -287,6 +287,17 @@ export async function updatePipelineRun(
   return updated;
 }
 
+export async function getPipelineRunById(
+  db: AppDb,
+  id: string,
+): Promise<PipelineRun | null> {
+  const rows = await db
+    .select()
+    .from(pipelineRuns)
+    .where(eq(pipelineRuns.id, id));
+  return rows[0] ?? null;
+}
+
 export async function getActivePipelineRuns(
   db: AppDb,
   fundId: string,

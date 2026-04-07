@@ -16,6 +16,43 @@ type AnyPublicClient = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyWalletClient = any;
 
+// ── Checkpoint recovery ─────────────────────────────────────────────────
+
+/** Per-phase output data stored in the checkpoint. */
+export interface CheckpointPhaseData {
+  claiming?: {
+    claimedLamports: number;
+    signatures: string[];
+  };
+  swapping?: {
+    outAmount: string;
+    signature: string;
+    inAmount: string;
+  };
+  fee?: {
+    feeAmount: string;
+    feeSignature: string | null;
+    bridgeAmount: string;
+  };
+  bridging?: {
+    orderId: string;
+    fulfillTx: string | null;
+    bridgeAmount: string;
+    bridgeSendSignature: string;
+  };
+  investing?: {
+    usdcToEthTxHash: string;
+    investTxHash: string;
+    amountInvested: string;
+  };
+}
+
+/** Checkpoint persisted in pipeline_runs.metadata for crash recovery. */
+export interface PipelineCheckpoint {
+  completedPhases: string[];
+  phaseData: CheckpointPhaseData;
+}
+
 // ── Pipeline options ────────────────────────────────────────────────────
 
 /** Everything the outbound pipeline needs to run. Dependency-injected. */
@@ -40,6 +77,12 @@ export interface OutboundPipelineOptions {
   evmWalletClient?: AnyWalletClient;
   /** Target BSKT contract address on Base (required for investing phase) */
   bsktAddress?: Address;
+
+  // ── Resume support ─────────────────────────────────────────────────
+  /** Existing pipeline run ID to resume (skips createPipelineRun if set) */
+  pipelineRunId?: string;
+  /** Checkpoint data from a previous partial run — phases listed here are skipped */
+  resumeCheckpoint?: PipelineCheckpoint;
 }
 
 // ── Pipeline result ─────────────────────────────────────────────────────

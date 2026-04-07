@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T18:29:49.669Z",
+  "exported_at": "2026-04-07T18:39:35.515Z",
   "milestones": [
     {
       "id": "M001",
@@ -1422,19 +1422,29 @@
       "milestone_id": "M002",
       "slice_id": "S02",
       "id": "T03",
-      "title": "Checkpoint recovery — persist per-phase state and resume from last completed phase",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Added checkpoint persistence to all 5 pipeline phases with per-phase state tracking and resumeOutboundPipeline() for crash recovery",
+      "status": "complete",
+      "one_liner": "Added checkpoint persistence to all 5 pipeline phases with per-phase state tracking and resumeOutboundPipeline() for crash recovery",
+      "narrative": "Extended types.ts with PipelineCheckpoint and CheckpointPhaseData types. Added resumeCheckpoint/pipelineRunId options to OutboundPipelineOptions. Implemented advisory writeCheckpoint() helper and parseCheckpoint() validator with safe fallback on malformed data. Wrapped all 5 pipeline phases (claiming, swapping, fee, bridging, investing) with checkpoint guards that skip and restore from checkpoint data when resuming. Added resumeOutboundPipeline() that reads checkpoint from DB via new getPipelineRunById() and calls the pipeline with resume data. Returns immediately with reconstructed result when all phases complete. Updated one existing test for checkpoint metadata interleaving. All 48 tests pass across 3 test files.",
+      "verification_result": "npx vitest run tests/checkpoint-recovery.test.ts tests/outbound-pipeline.test.ts tests/pipeline-investing.test.ts — 48 tests pass (19 new + 20 existing outbound + 9 investing). npx tsc --noEmit — zero errors in pipeline/db modules.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T18:39:35.418Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Updated existing test 'updates phases' in outbound-pipeline.test.ts to filter for phase/status updates, since checkpoint metadata writes now interleave with phase transition calls.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/pipeline/types.ts",
+        "src/pipeline/outbound.ts",
+        "src/db/fund-repository.ts",
+        "tests/checkpoint-recovery.test.ts",
+        "tests/outbound-pipeline.test.ts"
+      ],
+      "key_decisions": [
+        "Checkpoint write is advisory — failures logged but never block pipeline",
+        "parseCheckpoint filters to known phases only, unknown phases treated as absent",
+        "resumeOutboundPipeline returns immediately with reconstructed result when all phases complete"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S02\nmilestone: M002\nkey_files:\n  - src/pipeline/types.ts\n  - src/pipeline/outbound.ts\n  - src/db/fund-repository.ts\n  - tests/checkpoint-recovery.test.ts\n  - tests/outbound-pipeline.test.ts\nkey_decisions:\n  - Checkpoint write is advisory — failures logged but never block pipeline\n  - parseCheckpoint filters to known phases only, unknown phases treated as absent\n  - resumeOutboundPipeline returns immediately with reconstructed result when all phases complete\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T18:39:35.417Z\nblocker_discovered: false\n---\n\n# T03: Added checkpoint persistence to all 5 pipeline phases with per-phase state tracking and resumeOutboundPipeline() for crash recovery\n\n**Added checkpoint persistence to all 5 pipeline phases with per-phase state tracking and resumeOutboundPipeline() for crash recovery**\n\n## What Happened\n\nExtended types.ts with PipelineCheckpoint and CheckpointPhaseData types. Added resumeCheckpoint/pipelineRunId options to OutboundPipelineOptions. Implemented advisory writeCheckpoint() helper and parseCheckpoint() validator with safe fallback on malformed data. Wrapped all 5 pipeline phases (claiming, swapping, fee, bridging, investing) with checkpoint guards that skip and restore from checkpoint data when resuming. Added resumeOutboundPipeline() that reads checkpoint from DB via new getPipelineRunById() and calls the pipeline with resume data. Returns immediately with reconstructed result when all phases complete. Updated one existing test for checkpoint metadata interleaving. All 48 tests pass across 3 test files.\n\n## Verification\n\nnpx vitest run tests/checkpoint-recovery.test.ts tests/outbound-pipeline.test.ts tests/pipeline-investing.test.ts — 48 tests pass (19 new + 20 existing outbound + 9 investing). npx tsc --noEmit — zero errors in pipeline/db modules.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/checkpoint-recovery.test.ts tests/outbound-pipeline.test.ts tests/pipeline-investing.test.ts` | 0 | ✅ pass | 15690ms |\n| 2 | `npx tsc --noEmit (src/pipeline + src/db)` | 0 | ✅ pass | 60000ms |\n\n## Deviations\n\nUpdated existing test 'updates phases' in outbound-pipeline.test.ts to filter for phase/status updates, since checkpoint metadata writes now interleave with phase transition calls.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/pipeline/types.ts`\n- `src/pipeline/outbound.ts`\n- `src/db/fund-repository.ts`\n- `tests/checkpoint-recovery.test.ts`\n- `tests/outbound-pipeline.test.ts`\n",
       "description": "Add checkpoint persistence to each pipeline phase and implement resumeOutboundPipeline() that reads the last checkpoint and continues from where it left off.\n\n## Why\nD013 requires resume-from-failed-step. Without checkpoints, a restart after bridging (which costs real money in gas/fees) would re-run claiming and swapping, wasting gas and potentially double-spending. This is critical for production reliability.\n\n## Steps\n1. Define checkpoint types in `src/pipeline/types.ts`:\n   - `PipelineCheckpoint` — `{ completedPhases: string[], phaseData: Record<string, unknown> }`\n   - Each phase stores its output data: claiming stores `{ claimedLamports, signatures }`, swapping stores `{ outAmount, signature }`, fee stores `{ feeAmount, feeSignature }`, bridging stores `{ orderId, fulfillTx, bridgeAmount }`, investing stores `{ usdcToEthTxHash, investTxHash, amountInvested }`.\n\n2. Add a `writeCheckpoint(db, runId, phase, phaseData)` helper in `src/pipeline/outbound.ts` that calls `updatePipelineRun(db, runId, { metadata: { checkpoint: { completedPhases: [...existing, phase], phaseData: { ...existing, [phase]: data } } } })`.\n\n3. Add checkpoint guards to each phase in `runOutboundPipeline()` using the pattern:\n   ```\n   if (checkpoint.completedPhases.includes('claiming')) {\n     // restore claimedLamports, txHashes.claim from checkpoint\n   } else {\n     // run claiming phase normally\n     // writeCheckpoint after success\n   }\n   ```\n   Do this for all 5 phases (claiming, swapping, fee, bridging, investing).\n\n4. Add `resumeOutboundPipeline(opts & { pipelineRunId: string })` that:\n   - Reads the pipeline run from DB via `updatePipelineRun` / direct query.\n   - Extracts checkpoint from metadata.\n   - Calls `runOutboundPipeline()` with a `resumeCheckpoint` option (the checkpoint data).\n   - The existing function checks for this option and uses it to skip completed phases.\n\n5. Write `tests/checkpoint-recovery.test.ts`:\n   - Test: full pipeline writes checkpoints after each phase (verify updatePipelineRun calls include metadata.checkpoint).\n   - Test: resume after claiming skips claim, runs swap→fee→bridge→invest.\n   - Test: resume after bridging skips claim→swap→fee→bridge, runs invest only.\n   - Test: resume with all phases complete returns immediately.\n   - Test: checkpoint data correctly restores txHashes and amounts for resumed phases.\n   - Test: resume with empty/missing checkpoint runs full pipeline.\n\n6. Verify backward compat: existing tests still pass with checkpoint writes (they don't check metadata deeply — verify this).\n\n## Failure Modes\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| DB checkpoint write | Log warning, continue pipeline (checkpoint is advisory) | Same — don't block pipeline on checkpoint | N/A |\n| DB checkpoint read (resume) | Treat as no checkpoint — run full pipeline | Same | Validate shape, fall back to full run |\n\n## Negative Tests\n- Resume with corrupt/malformed checkpoint data runs full pipeline (safe fallback)\n- Resume with unknown phases in completedPhases ignores them\n- Checkpoint write failure doesn't abort the pipeline phase",
       "estimate": "1h30m",
       "files": [
@@ -2466,6 +2476,28 @@
       "verdict": "✅ pass",
       "duration_ms": 200,
       "created_at": "2026-04-07T18:29:49.554Z"
+    },
+    {
+      "id": 51,
+      "task_id": "T03",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/checkpoint-recovery.test.ts tests/outbound-pipeline.test.ts tests/pipeline-investing.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 15690,
+      "created_at": "2026-04-07T18:39:35.418Z"
+    },
+    {
+      "id": 52,
+      "task_id": "T03",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "npx tsc --noEmit (src/pipeline + src/db)",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 60000,
+      "created_at": "2026-04-07T18:39:35.418Z"
     }
   ]
 }
