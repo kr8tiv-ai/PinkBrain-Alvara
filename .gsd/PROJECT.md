@@ -23,22 +23,23 @@ All six critical subsystems proven independently and the outbound pipeline wired
 | S01: Alvara Backend API & BSKT Investment | ✅ Complete | Typed API client (4 endpoints), contribute orchestration, CLI with dry-run, 50 tests. |
 | S02: Accumulation Scheduler & Automated Pipeline | ✅ Complete | BullMQ scheduler, 5-phase pipeline (claim→swap→fee→bridge→invest), checkpoint crash recovery, 57 new tests (250 total). |
 | S03: Rebalancing & Emergency Controls | ✅ Complete | rebalanceBSKT() orchestration, emergencyStables()/emergencyRevert() with snapshot state, 2 CLI scripts, 30 new tests (80 across Alvara modules). |
-| S04: On-Chain Divestment Config Registry | ⬜ Next | Solidity contract + TypeScript client |
-| S05: REST API & Fund Management | ⬜ Pending | Fastify REST API wiring all subsystems |
+| S04: On-Chain Divestment Config Registry | ✅ Complete | DivestmentRegistry.sol (immutable one-shot registration), TypeScript client, deploy helper + CLI, Ethereum chain config, 33 tests (12 Forge + 15 vitest + 6 anvil integration). Gas: 161k. |
+| S05: REST API & Fund Management | ⬜ Next | Fastify REST API wiring all subsystems |
 
-**S03 Delivered:**
-- `src/alvara/rebalance.ts` — rebalanceBSKT() orchestration: ownership check → backend-signed routes → gas estimate → tx → BSKTRebalanced event parsing → LP verification. RebalanceMode enum (STANDARD, EMERGENCY_STABLES, REVERT_EMERGENCY). Dry-run support.
-- `src/alvara/emergency.ts` — emergencyStables() snapshots composition then rebalances to 95% USDT + 5% ALVA. emergencyRevert() restores from snapshot. Both wrap rebalanceBSKT().
-- `scripts/rebalance-bskt.ts` — CLI for manual rebalance with arg validation (weights sum, token/weight count match)
-- `scripts/emergency-stables.ts` — CLI for emergency conversion with snapshot file I/O for revert
-- USDT added to KNOWN_ADDRESSES in chains.ts
+**S04 Delivered:**
+- `contracts/src/DivestmentRegistry.sol` — Immutable per-fund divestment config storage. Custom errors (AlreadyRegistered, InvalidSplitBps). No proxy/owner/admin.
+- `src/registry/client.ts` — TypeScript client: registerConfig, getConfig, fundIdToBytes32 (UUID→bytes32 key derivation), encodeTriggerParams/decodeTriggerParams for ABI-encoding per trigger type.
+- `src/registry/deploy.ts` — Reusable deployRegistry() loading Foundry bytecode at runtime.
+- `scripts/deploy-registry.ts` — CLI deploy script with --chain base|ethereum and --rpc-url flags.
+- `src/config/chains.ts` — Added createEthereumClient(), ETHEREUM_KNOWN_ADDRESSES, ETH_RPCS for R021 dual-chain support.
+- 33 tests total: 12 Forge, 15 vitest unit, 6 anvil integration (graceful skip when anvil unavailable).
 
 ## Architecture / Key Patterns
 
 **Three-layer architecture:**
 - **Solana Operations Layer** — Bags SDK fee share, Jupiter swaps, SPL token distribution, Helius RPC holder resolution
 - **Bridge Orchestration Layer (Fund Engine)** — Node.js service coordinating cross-chain state, PostgreSQL + BullMQ, multi-fund state machines
-- **EVM Operations Layer** — Alvara factory interaction on Base + Ethereum, viem, ERC-721 basket management, backend-signed swap routes
+- **EVM Operations Layer** — Alvara factory interaction on Base + Ethereum, viem, ERC-721 basket management, backend-signed swap routes, on-chain divestment config registry
 
 **Key tech stack:**
 - TypeScript (Node.js 18+) for all backend services
@@ -49,18 +50,18 @@ All six critical subsystems proven independently and the outbound pipeline wired
 - vitest for unit testing (established in M001/S02)
 - Drizzle ORM + node-postgres for fund data persistence (established in M001/S05)
 - PostgreSQL 16 + Redis 7 / BullMQ for state and job queues
-- Foundry for Solidity contracts
+- Foundry for Solidity contracts (DivestmentRegistry)
 
 **Key constraints:**
 - Alvara BSKTs are ERC-721 NFTs with custom interface (not standard ERC-7621)
 - BSKT creation and contribution require Alvara backend-signed swap routes (MEV protection)
 - contribute() is on the BSKT NFT contract, not BSKTPair or factory (K014)
 - Every BSKT must include ≥5% ALVA token allocation
-- Divestment config immutable after fund creation, stored on-chain
+- Divestment config immutable after fund creation, stored on-chain via DivestmentRegistry
 - Distribution to top 100 holders by token balance (not a separate staking contract)
 - Alvara backend API base URL not yet confirmed — defaults to https://api.alvara.xyz, configurable via ALVARA_API_URL
 
-**Established patterns (M001 + M002/S01-S03):**
+**Established patterns (M001 + M002/S01-S04):**
 - Blockscout free API for Base chain (Etherscan V2 optional fallback with paid key)
 - EIP-1967 proxy detection for Alvara contract resolution
 - Beacon proxy ABI resolution — factory.*Implementation() → beacon.implementation() → Blockscout verified ABI
@@ -77,6 +78,10 @@ All six critical subsystems proven independently and the outbound pipeline wired
 - Advisory checkpoint writes — failures logged but never block pipeline
 - BullMQ Worker with per-fund error isolation and concurrency guards
 - Raw SPL Token instruction building from @solana/web3.js primitives
+- Foundry + viem integration: Forge for Solidity tests, viem for TS client, shared ABI JSON
+- Anvil integration test pattern: random port, graceful skip, full deploy-interact-verify cycle
+- Reusable deploy helper pattern: shared function for CLI and tests
+- fundId key derivation: UUID → keccak256 → bytes32 for on-chain mapping keys
 
 ## Capability Contract
 
@@ -85,6 +90,6 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 ## Milestone Sequence
 
 - [x] M001: Risk Retirement & Subsystem Proof — COMPLETE ✅
-- [ ] M002: Outbound Pipeline (Solana → Alvara) — S01-S03 complete, S04-S05 remaining
+- [ ] M002: Outbound Pipeline (Solana → Alvara) — S01-S04 complete, S05 remaining
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation

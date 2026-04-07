@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T19:30:46.731Z",
+  "exported_at": "2026-04-07T19:45:59.451Z",
   "milestones": [
     {
       "id": "M001",
@@ -313,14 +313,14 @@
       "milestone_id": "M002",
       "id": "S04",
       "title": "On-Chain Divestment Config Registry",
-      "status": "pending",
+      "status": "complete",
       "risk": "low",
       "depends": [],
       "demo": "Deploy DivestmentRegistry on Base testnet/mainnet. Register a fund's divestment config via TypeScript client. Read it back from a different wallet. Attempt to overwrite — verify it reverts. Verify gas cost is reasonable (<500k gas for registration).",
       "created_at": "2026-04-07T10:21:06.078Z",
-      "completed_at": null,
-      "full_summary_md": "",
-      "full_uat_md": "",
+      "completed_at": "2026-04-07T19:34:39.447Z",
+      "full_summary_md": "---\nid: S04\nparent: M002\nmilestone: M002\nprovides:\n  - DivestmentRegistry contract ABI and bytecode (Foundry artifacts)\n  - registerConfig/getConfig TypeScript client functions\n  - deployRegistry() reusable deploy helper\n  - fundIdToBytes32 key derivation utility\n  - encodeTriggerParams/decodeTriggerParams for trigger config encoding\n  - createEthereumClient() for Ethereum mainnet chain operations\n  - deploy-registry.ts CLI script for mainnet/testnet deployment\nrequires:\n  []\naffects:\n  []\nkey_files:\n  - contracts/src/DivestmentRegistry.sol\n  - contracts/test/DivestmentRegistry.t.sol\n  - src/config/divestment-registry-abi.json\n  - src/registry/client.ts\n  - src/registry/types.ts\n  - src/registry/deploy.ts\n  - src/registry/index.ts\n  - src/config/chains.ts\n  - scripts/deploy-registry.ts\n  - tests/divestment-registry.test.ts\n  - tests/registry-integration.test.ts\nkey_decisions:\n  - D004: Immutable divestment config — no proxy, no owner, no admin\n  - D011: Single registry contract per chain\n  - Custom errors (AlreadyRegistered, InvalidSplitBps) over require strings for gas efficiency\n  - fundIdToBytes32 uses keccak256(toHex(uuid)) for deterministic key derivation\n  - loadBytecode reads Foundry artifact at runtime — no bytecode committed to TS source\n  - Client does not duplicate on-chain BPS validation — contract enforces via revert\npatterns_established:\n  - Foundry + viem integration pattern: Forge for Solidity tests, viem for TypeScript client, shared ABI JSON\n  - Anvil integration test pattern: random port, graceful skip when unavailable, full deploy-interact-verify cycle\n  - Reusable deploy helper pattern: shared function used by both CLI script and integration tests\n  - fundId key derivation: UUID → keccak256 → bytes32 for on-chain mapping keys\nobservability_surfaces:\n  - none\ndrill_down_paths:\n  []\nduration: \"\"\nverification_result: passed\ncompleted_at: 2026-04-07T19:34:39.457Z\nblocker_discovered: false\n---\n\n# S04: On-Chain Divestment Config Registry\n\n**Delivered DivestmentRegistry Solidity contract with immutable one-shot registration, full TypeScript client, deploy helper with CLI, Ethereum mainnet chain config, and 33 passing tests (12 Forge + 15 vitest unit + 6 anvil integration) — max gas 161k.**\n\n## What Happened\n\nThree tasks delivered the full on-chain divestment config registry stack:\n\n**T01 — Solidity contract.** DivestmentRegistry.sol implements immutable per-fund config storage. Each fund gets a single registration keyed by bytes32 fund ID. The struct stores holderSplitBps, ownerSplitBps, triggerType, triggerParams (raw bytes), distributionCurrency, creator, and registeredAt. Custom errors (AlreadyRegistered, InvalidSplitBps) replace require strings for gas efficiency. No proxy, no owner, no admin — the contract is fully immutable once deployed. 12 Forge tests cover happy path, revert on duplicate registration, revert on invalid BPS, independent fund IDs, event emission, creator/timestamp correctness, and boundary conditions. Gas report: registerConfig max 161,317 — well under the 500k target.\n\n**T02 — TypeScript client.** The registry client module (src/registry/) provides: fundIdToBytes32 for deterministic UUID→bytes32 key derivation via keccak256, encodeTriggerParams/decodeTriggerParams for ABI-encoding per trigger type (Time, Threshold, Both), registerConfig following the injected-client pattern (walletClient + publicClient params), and getConfig returning null for unregistered funds. Ethereum mainnet chain config added to chains.ts with createEthereumClient(), ETHEREUM_KNOWN_ADDRESSES, and ETH_RPCS — completing R021 dual-chain support infrastructure. 15 vitest unit tests with mocked viem cover determinism, roundtrip encoding, contract call correctness, revert handling, and null returns.\n\n**T03 — Deploy helper and integration tests.** Reusable deployRegistry() function in src/registry/deploy.ts loads Foundry bytecode at runtime. CLI script (scripts/deploy-registry.ts) accepts --chain base|ethereum and --rpc-url flags, reads DEPLOYER_PRIVATE_KEY from env. 6 anvil integration tests prove the full lifecycle: deploy → register → read from different wallet (public verifiability) → overwrite reverts → gas under 500k. Anvil runs on random port to avoid collisions. Graceful skip when anvil is unavailable (vitest exits 0).\n\nAll 33 tests pass. R009 (on-chain divestment config verifiability) is advanced — full validation awaits real chain deployment.\n\n## Verification\n\n**Forge tests:** 12/12 pass — covers registration, reverts, events, boundary conditions.\n**Gas report:** registerConfig max 161,317 gas (< 500k target).\n**Vitest unit tests:** 15/15 pass — covers client functions, encoding roundtrips, mock contract calls.\n**Integration tests:** 6/6 pass on anvil — full deploy → register → read → overwrite-revert → gas-check flow.\n**File existence:** All expected outputs present (ABI JSON, deploy.ts, client.ts, types.ts, index.ts).\n**Deploy CLI:** --help prints usage without crashing.\n**Ethereum config:** createEthereumClient confirmed in chains.ts.\n\n## Requirements Advanced\n\n- R009 — DivestmentRegistry stores immutable per-fund config on-chain. Integration test proves public verifiability (read from different wallet). Full validation awaits real chain deployment.\n- R021 — createEthereumClient() added to chains.ts with ETHEREUM_KNOWN_ADDRESSES and ETH_RPCS. Deploy script accepts --chain base|ethereum flag.\n\n## Requirements Validated\n\nNone.\n\n## New Requirements Surfaced\n\nNone.\n\n## Requirements Invalidated or Re-scoped\n\nNone.\n\n## Deviations\n\nNone.\n\n## Known Limitations\n\nContract not yet deployed to Base or Ethereum mainnet — integration proof is on local anvil only. Real deployment requires DEPLOYER_PRIVATE_KEY with funded account.\n\n## Follow-ups\n\nS05 REST API will expose fund creation endpoint that calls registerConfig to persist divestment config on-chain during fund setup.\n\n## Files Created/Modified\n\n- `contracts/src/DivestmentRegistry.sol` — Solidity contract with immutable per-fund divestment config storage\n- `contracts/test/DivestmentRegistry.t.sol` — 12 Forge tests covering registration, reverts, events, boundaries\n- `contracts/foundry.toml` — Foundry project configuration\n- `src/config/divestment-registry-abi.json` — Extracted ABI JSON for TypeScript client\n- `src/registry/client.ts` — TypeScript client: registerConfig, getConfig, fundIdToBytes32, encode/decode helpers\n- `src/registry/types.ts` — TypeScript types: TriggerType enum, OnChainDivestmentConfig, RegisterConfigParams\n- `src/registry/deploy.ts` — Reusable deployRegistry() function loading Foundry bytecode at runtime\n- `src/registry/index.ts` — Barrel export for registry module\n- `src/config/chains.ts` — Added createEthereumClient(), ETHEREUM_KNOWN_ADDRESSES, ETH_RPCS\n- `scripts/deploy-registry.ts` — CLI deploy script with --chain/--rpc-url flags\n- `tests/divestment-registry.test.ts` — 15 vitest unit tests for TypeScript client\n- `tests/registry-integration.test.ts` — 6 anvil integration tests for full deploy-register-read-revert lifecycle\n",
+      "full_uat_md": "# S04: On-Chain Divestment Config Registry — UAT\n\n**Milestone:** M002\n**Written:** 2026-04-07T19:34:39.458Z\n\n## UAT: S04 — On-Chain Divestment Config Registry\n\n### Preconditions\n- Foundry installed (`forge --version` succeeds)\n- Node.js 18+ with project dependencies installed (`node_modules/` present)\n- Anvil available for integration tests (`which anvil` succeeds)\n\n---\n\n### Test Case 1: Solidity Contract Compilation and Tests\n\n**Steps:**\n1. `cd contracts && forge build`\n   - **Expected:** Compiles with no errors or warnings\n2. `cd contracts && forge test -vvv`\n   - **Expected:** 12/12 tests pass:\n     - test_registerAndReadBack — register config, read all fields match\n     - test_revert_alreadyRegistered — second registration same fundId reverts\n     - test_differentFundIdsAreIndependent — separate fundIds succeed independently\n     - test_revert_invalidSplitBps_tooHigh — 5000+6000=11000 reverts InvalidSplitBps\n     - test_revert_invalidSplitBps_tooLow — 4000+5000=9000 reverts InvalidSplitBps\n     - test_revert_invalidSplitBps_bothZero — 0+0 reverts InvalidSplitBps\n     - test_zeroLengthTriggerParams — empty triggerParams is valid\n     - test_registeredAtMatchesTimestamp — matches block.timestamp\n     - test_creatorMatchesMsgSender — matches msg.sender\n     - test_emitsConfigRegisteredEvent — ConfigRegistered event emitted\n     - test_maxUint16SplitBps — 0+10000 and 10000+0 both valid\n     - test_getConfig_unregisteredReturnsZero — returns zeroed struct\n\n### Test Case 2: Gas Budget\n\n**Steps:**\n1. `cd contracts && forge test --gas-report 2>&1 | grep registerConfig`\n   - **Expected:** Max gas < 500,000. Observed: 161,317.\n\n### Test Case 3: ABI Extraction\n\n**Steps:**\n1. `cat src/config/divestment-registry-abi.json | python3 -m json.tool > /dev/null`\n   - **Expected:** Valid JSON array of ABI entries\n2. Verify ABI includes: registerConfig, getConfig, configs, registered, ConfigRegistered event, AlreadyRegistered error, InvalidSplitBps error\n\n### Test Case 4: TypeScript Client Unit Tests\n\n**Steps:**\n1. `npx vitest run tests/divestment-registry.test.ts`\n   - **Expected:** 15/15 tests pass:\n     - fundIdToBytes32 produces 0x-prefixed 66-char hex\n     - fundIdToBytes32 is deterministic (same UUID → same hash)\n     - different UUIDs produce different hashes\n     - encodeTriggerParams Time roundtrip\n     - encodeTriggerParams Threshold roundtrip\n     - encodeTriggerParams Both roundtrip\n     - registerConfig calls writeContract with correct args\n     - registerConfig returns txHash and gasUsed\n     - getConfig returns mapped config for registered fund\n     - getConfig returns null for unregistered fund\n     - registerConfig handles AlreadyRegistered revert\n     - registerConfig handles InvalidSplitBps revert\n     - Client-side validation (holderSplitBps + ownerSplitBps != 10000 throws)\n     - Type exports from index barrel\n     - Ethereum chain config integration\n\n### Test Case 5: Ethereum Chain Config\n\n**Steps:**\n1. `grep -c 'createEthereumClient' src/config/chains.ts`\n   - **Expected:** ≥ 1\n2. `grep -c 'ETHEREUM_KNOWN_ADDRESSES' src/config/chains.ts`\n   - **Expected:** ≥ 1\n3. `grep -c 'ETH_RPCS' src/config/chains.ts`\n   - **Expected:** ≥ 1\n\n### Test Case 6: Deploy Script Usage\n\n**Steps:**\n1. `npx tsx scripts/deploy-registry.ts --help`\n   - **Expected:** Prints usage showing --chain, --rpc-url flags, DEPLOYER_PRIVATE_KEY requirement. Exits 0.\n2. `npx tsx scripts/deploy-registry.ts --chain base` (without DEPLOYER_PRIVATE_KEY)\n   - **Expected:** Prints error about missing DEPLOYER_PRIVATE_KEY. Exits 1.\n\n### Test Case 7: Integration Test — Full Lifecycle on Anvil\n\n**Steps:**\n1. `npx vitest run tests/registry-integration.test.ts`\n   - **Expected:** 6/6 tests pass:\n     - Deploy DivestmentRegistry to local anvil\n     - Register config with known UUID → read back all fields match\n     - Read config from different wallet → same result (public verifiability, R009)\n     - Register same fundId again → reverts with AlreadyRegistered\n     - Gas used for registration < 500,000\n     - Deploy helper returns valid address and txHash\n\n### Test Case 8: Overwrite Immutability (negative test)\n\n**Steps:**\n1. In integration test: after registering fundId \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\", attempt registerConfig with same fundId but different split values\n   - **Expected:** Transaction reverts with AlreadyRegistered error\n   - **Verified in:** registry-integration.test.ts \"overwrite reverts\" test case\n\n### Edge Cases\n\n- **Zero-length triggerParams:** Registration succeeds (tested in Forge test_zeroLengthTriggerParams)\n- **Max uint16 BPS values:** 10000+0 and 0+10000 both valid (tested in Forge test_maxUint16SplitBps)\n- **Unregistered fund read:** getConfig returns null/zeroed struct, not revert (tested in both Forge and vitest)\n- **Anvil unavailable:** Integration test suite skips gracefully, vitest exits 0 (K012 pattern)\n",
       "goal": "Deploy DivestmentRegistry Solidity contract and build TypeScript client for on-chain registration and public verification of fund divestment configurations. The contract stores immutable config per fund — once registered, overwrite reverts. Supports dual-chain deployment (Base + Ethereum).",
       "success_criteria": "- `forge test` passes — all Solidity tests green, gas report shows registration < 500k gas\n- `npx vitest run tests/divestment-registry.test.ts` passes — TypeScript client unit tests green\n- Integration test deploys to local anvil, registers config, reads back, verifies overwrite reverts\n- Ethereum chain config exists in `src/config/chains.ts` alongside Base",
       "proof_level": "This slice proves: contract + integration (via anvil local EVM, not live testnet). Real runtime required: no (anvil simulates EVM faithfully). Human/UAT required: no — anvil integration is deterministic.",
@@ -335,22 +335,17 @@
       "title": "REST API & Fund Management",
       "status": "pending",
       "risk": "low",
-      "depends": [
-        "S01",
-        "S02",
-        "S03",
-        "S04"
-      ],
+      "depends": [],
       "demo": "Using curl: POST /funds to create a fund with name, token mint, chain, divestment config, and basket composition. GET /funds/:id to see status, wallet addresses, and pipeline history. POST /funds/:id/rebalance with new weights. POST /funds/:id/emergency to trigger stables conversion. POST /funds/:id/emergency/revert to restore.",
       "created_at": "2026-04-07T10:21:06.079Z",
       "completed_at": null,
       "full_summary_md": "",
       "full_uat_md": "",
-      "goal": "Build a Fastify REST API that exposes all fund management operations: create fund (with wallet generation, config locking, and registry registration), get fund status, trigger rebalance, trigger emergency stables, and revert emergency. This is the entry point for M004's frontend.",
-      "success_criteria": "- Fastify server with typed route schemas (JSON Schema validation)\\n- POST /funds — creates fund, generates wallets, locks divestment config, registers on-chain\\n- GET /funds/:id — returns fund status, wallets, pipeline runs, BSKT info\\n- POST /funds/:id/rebalance — triggers rebalance with new weights\\n- POST /funds/:id/emergency — triggers Emergency Stables\\n- POST /funds/:id/emergency/revert — reverts emergency\\n- Error handling middleware with structured error responses\\n- Request/response logging\\n- Health check endpoint\\n- Integration tests for all endpoints",
-      "proof_level": "Integration proof — API tests with real DB, mocked external services",
-      "integration_closure": "REST API is the public interface consumed by M004 frontend. All operations route through the API — no direct module imports from the frontend.",
-      "observability_impact": "Request/response logging with correlation IDs. Error responses include structured error codes for frontend consumption. Health check exposes service status, DB connectivity, and Redis connectivity.",
+      "goal": "Fastify REST API exposing fund CRUD, rebalance, and emergency operations with JSON Schema validation, domain error mapping, and fastify.inject() integration tests.",
+      "success_criteria": "- POST /funds creates a fund with wallets and divestment config, returns 201 with fund data\n- GET /funds/:id returns fund with wallets, divestment config, and recent transactions\n- GET /funds returns all funds, filterable by status\n- POST /funds/:id/rebalance triggers rebalanceBSKT() with request body parameters\n- POST /funds/:id/emergency triggers emergencyStables() and persists snapshot to pipeline_runs metadata\n- POST /funds/:id/emergency/revert reads snapshot from DB (or request body fallback) and restores composition\n- GET /health returns 200 with DB connectivity status\n- All domain errors map to correct HTTP status codes (404, 409, 400, 502, 500)\n- All routes have JSON Schema request validation (400 on invalid input)\n- `npx vitest run tests/api-funds.test.ts tests/api-rebalance.test.ts tests/api-emergency.test.ts` — all pass",
+      "proof_level": "Contract-level — all verification via fastify.inject() against mocked DB/domain layers. No real PostgreSQL, no real EVM clients. Real runtime proof is M003+ concern.",
+      "integration_closure": "- Upstream surfaces consumed: `src/db/fund-repository.ts` (all CRUD), `src/alvara/rebalance.ts` (rebalanceBSKT), `src/alvara/emergency.ts` (emergencyStables/emergencyRevert), `src/registry/client.ts` (registerConfig), `src/db/connection.ts` (createDb/getDbPool), `src/db/errors.ts` (FundNotFound/InvalidStateTransition/ConfigLocked)\n- New wiring: Fastify server factory composing all domain modules behind HTTP routes with JSON Schema validation\n- What remains: Nothing — this is the final slice of M002. After this, the full outbound pipeline is API-accessible.",
+      "observability_impact": "- Runtime signals: Structured JSON logs from all route handlers (module: 'api', action: per-route)\n- Inspection surfaces: GET /health endpoint for DB connectivity, Fastify built-in request logging\n- Failure visibility: Domain errors mapped to HTTP status codes with structured error body { error, message, details }\n- Redaction constraints: No secrets in request/response logging — Fastify default serializers handle this",
       "sequence": 0,
       "replan_triggered_at": null
     }
@@ -1819,6 +1814,120 @@
       "observability_impact": "",
       "full_plan_md": "",
       "sequence": 0
+    },
+    {
+      "milestone_id": "M002",
+      "slice_id": "S05",
+      "id": "T01",
+      "title": "Installed fastify, built server factory with error handler, fund CRUD routes, health check, JSON schemas, CLI entry point, and 8 passing fastify.inject() tests",
+      "status": "complete",
+      "one_liner": "Installed fastify, built server factory with error handler, fund CRUD routes, health check, JSON schemas, CLI entry point, and 8 passing fastify.inject() tests",
+      "narrative": "Installed fastify as a production dependency. Built the createServer() factory accepting { db, dbPool?, publicClient?, walletClient?, registryAddress? } with decorated dependencies and a comprehensive error handler mapping domain errors to HTTP statuses (FundNotFound→404, InvalidStateTransition→409, ConfigLocked→409, AlvaraApiError→502, validation→400, unknown→500). Created fund CRUD routes (POST /funds with four-step create sequence, GET /funds with status filter, GET /funds/:id with detail), health route, JSON Schema validation, barrel export, and CLI entry point. All 8 fastify.inject() tests pass covering happy paths and error cases.",
+      "verification_result": "Ran npx vitest run tests/api-funds.test.ts — 8 tests passed (create 201, invalid body 400, empty body 400, get by id 200, not found 404, list 200, list with filter 200, health 200). Ran node -e \"import('fastify').then(...)  — fastify importable confirmed.",
+      "duration": "",
+      "completed_at": "2026-04-07T19:45:59.361Z",
+      "blocker_discovered": false,
+      "deviations": "Added type casts (as unknown as Record&lt;string, unknown&gt;) in fund routes for the generic serializeDates helper — Drizzle inferred types need assertion for the generic helper. Functionally equivalent.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/api/server.ts",
+        "src/api/routes/funds.ts",
+        "src/api/routes/health.ts",
+        "src/api/schemas/funds.ts",
+        "src/api/index.ts",
+        "scripts/start-api.ts",
+        "tests/api-funds.test.ts",
+        "package.json"
+      ],
+      "key_decisions": [
+        "Error handler uses both instanceof and name-based checks for domain errors to handle cross-module boundary cases",
+        "Server factory takes flat ServerDeps object for simplicity",
+        "Date serialization via generic serializeDates helper"
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S05\nmilestone: M002\nkey_files:\n  - src/api/server.ts\n  - src/api/routes/funds.ts\n  - src/api/routes/health.ts\n  - src/api/schemas/funds.ts\n  - src/api/index.ts\n  - scripts/start-api.ts\n  - tests/api-funds.test.ts\n  - package.json\nkey_decisions:\n  - Error handler uses both instanceof and name-based checks for domain errors to handle cross-module boundary cases\n  - Server factory takes flat ServerDeps object for simplicity\n  - Date serialization via generic serializeDates helper\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:45:59.360Z\nblocker_discovered: false\n---\n\n# T01: Installed fastify, built server factory with error handler, fund CRUD routes, health check, JSON schemas, CLI entry point, and 8 passing fastify.inject() tests\n\n**Installed fastify, built server factory with error handler, fund CRUD routes, health check, JSON schemas, CLI entry point, and 8 passing fastify.inject() tests**\n\n## What Happened\n\nInstalled fastify as a production dependency. Built the createServer() factory accepting { db, dbPool?, publicClient?, walletClient?, registryAddress? } with decorated dependencies and a comprehensive error handler mapping domain errors to HTTP statuses (FundNotFound→404, InvalidStateTransition→409, ConfigLocked→409, AlvaraApiError→502, validation→400, unknown→500). Created fund CRUD routes (POST /funds with four-step create sequence, GET /funds with status filter, GET /funds/:id with detail), health route, JSON Schema validation, barrel export, and CLI entry point. All 8 fastify.inject() tests pass covering happy paths and error cases.\n\n## Verification\n\nRan npx vitest run tests/api-funds.test.ts — 8 tests passed (create 201, invalid body 400, empty body 400, get by id 200, not found 404, list 200, list with filter 200, health 200). Ran node -e \"import('fastify').then(...)  — fastify importable confirmed.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/api-funds.test.ts` | 0 | ✅ pass | 17700ms |\n| 2 | `node -e \"import('fastify').then(() => console.log('fastify importable'))\"` | 0 | ✅ pass | 1000ms |\n\n## Deviations\n\nAdded type casts (as unknown as Record&lt;string, unknown&gt;) in fund routes for the generic serializeDates helper — Drizzle inferred types need assertion for the generic helper. Functionally equivalent.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/api/server.ts`\n- `src/api/routes/funds.ts`\n- `src/api/routes/health.ts`\n- `src/api/schemas/funds.ts`\n- `src/api/index.ts`\n- `scripts/start-api.ts`\n- `tests/api-funds.test.ts`\n- `package.json`\n",
+      "description": "Install fastify. Create src/api/server.ts with createServer() factory accepting { db, publicClient?, walletClient?, registryAddress? }. Decorate dependencies onto the Fastify instance. Register error handler plugin mapping FundNotFound→404, InvalidStateTransition→409, ConfigLocked→409, Fastify validation→400, AlvaraApiError→502, unknown→500. Create fund routes plugin (src/api/routes/funds.ts): POST /funds (create fund + wallets + divestment config + lock config), GET /funds (list, optional ?status filter), GET /funds/:id (fund + wallets + divestment config + recent transactions). Create JSON Schema definitions for fund request/response bodies (src/api/schemas/funds.ts). Create health route (src/api/routes/health.ts): GET /health returning { status: 'ok', db: boolean }. Create scripts/start-api.ts CLI entry point with --port and --host flags. Create src/api/index.ts barrel export. Write tests/api-funds.test.ts using fastify.inject() with mocked fund-repository functions covering: create fund happy path (201), create with invalid body (400), get fund by id (200), get fund not found (404), list funds (200), list with status filter (200).\n\nKey constraints:\n- Fastify v5 requires full JSON Schema objects (type + properties), not shorthand\n- ESM import: `import Fastify from 'fastify'`\n- Server accepts AppDb instance for testability — never imports createDb() directly\n- Token amounts remain strings (bigint safety — K005/D028 pattern)\n- Structured JSON logging: { module: 'api', action: '...', ... }\n- POST /funds should: createFund → setFundWallets → setDivestmentConfig → lockDivestmentConfig, all in sequence\n- Tests mock fund-repository via vi.mock() — no real DB needed",
+      "estimate": "2h",
+      "files": [
+        "package.json",
+        "src/api/server.ts",
+        "src/api/routes/funds.ts",
+        "src/api/routes/health.ts",
+        "src/api/schemas/funds.ts",
+        "src/api/index.ts",
+        "scripts/start-api.ts",
+        "tests/api-funds.test.ts"
+      ],
+      "verify": "npx vitest run tests/api-funds.test.ts && node -e \"import('fastify').then(() => console.log('fastify importable'))\"",
+      "inputs": [
+        "`src/db/fund-repository.ts` — all CRUD functions (createFund, getFundById, listFunds, setFundWallets, setDivestmentConfig, lockDivestmentConfig, getDivestmentConfig, getFundWallets, getTransactionsByFund)",
+        "`src/db/errors.ts` — FundNotFound, InvalidStateTransition, ConfigLocked error classes",
+        "`src/db/types.ts` — Fund, NewFund, FundWallet, NewFundWallet, FundDivestmentConfig, NewFundDivestmentConfig types",
+        "`src/db/connection.ts` — AppDb type, createDb, getDbPool",
+        "`package.json` — existing dependencies and scripts"
+      ],
+      "expected_output": [
+        "`src/api/server.ts` — createServer() factory with plugin registration and error handler",
+        "`src/api/routes/funds.ts` — POST /funds, GET /funds, GET /funds/:id route plugin",
+        "`src/api/routes/health.ts` — GET /health route plugin",
+        "`src/api/schemas/funds.ts` — JSON Schema definitions for fund request/response bodies",
+        "`src/api/index.ts` — barrel exports for API module",
+        "`scripts/start-api.ts` — CLI entry point with --port/--host flags",
+        "`tests/api-funds.test.ts` — fastify.inject() tests for fund CRUD routes"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
+    },
+    {
+      "milestone_id": "M002",
+      "slice_id": "S05",
+      "id": "T02",
+      "title": "Rebalance and emergency routes with snapshot persistence and integration tests",
+      "status": "pending",
+      "one_liner": "",
+      "narrative": "",
+      "verification_result": "",
+      "duration": "",
+      "completed_at": null,
+      "blocker_discovered": false,
+      "deviations": "",
+      "known_issues": "",
+      "key_files": [],
+      "key_decisions": [],
+      "full_summary_md": "",
+      "description": "Add rebalance route plugin (src/api/routes/rebalance.ts): POST /funds/:id/rebalance — validates fund exists and has bsktAddress, calls rebalanceBSKT() with request body parameters (newTokens, newWeights, amountIn, mode, dryRun). Returns rebalance result or 502 on Alvara API error.\n\nAdd emergency route plugin (src/api/routes/emergency.ts): POST /funds/:id/emergency — validates fund, calls emergencyStables(), persists snapshot to pipeline_runs metadata (create a pipeline_run with direction='outbound', phase='investing', metadata containing the snapshot JSON), returns result + snapshot. POST /funds/:id/emergency/revert — reads latest emergency snapshot from pipeline_runs metadata (via getActivePipelineRuns or a new query), falls back to request body snapshot if provided, calls emergencyRevert(), returns result.\n\nCreate JSON Schema definitions for rebalance and emergency request/response (src/api/schemas/rebalance.ts, src/api/schemas/emergency.ts).\n\nRegister new route plugins in createServer().\n\nWrite tests/api-rebalance.test.ts: rebalance happy path (200), fund not found (404), fund without bsktAddress (409), invalid body (400), Alvara API error (502), dry run (200).\n\nWrite tests/api-emergency.test.ts: emergency stables happy path (200), emergency revert with DB snapshot (200), emergency revert with body snapshot (200), fund not found (404), Alvara API error (502), dry run (200).\n\nKey constraints:\n- rebalanceBSKT/emergencyStables/emergencyRevert require publicClient + walletClient — if not decorated on server, return 503 Service Unavailable\n- Emergency snapshot persistence uses existing updatePipelineRun() with metadata field — no schema change\n- Snapshot stored as JSON in pipeline_runs.metadata: { type: 'emergency_snapshot', snapshot: { tokens, weights } }\n- Token amounts as strings for bigint safety\n- Tests mock both fund-repository AND alvara modules via vi.mock()\n- All route handlers check server.publicClient/server.walletClient availability before attempting EVM calls",
+      "estimate": "2h",
+      "files": [
+        "src/api/routes/rebalance.ts",
+        "src/api/routes/emergency.ts",
+        "src/api/schemas/rebalance.ts",
+        "src/api/schemas/emergency.ts",
+        "src/api/server.ts",
+        "tests/api-rebalance.test.ts",
+        "tests/api-emergency.test.ts"
+      ],
+      "verify": "npx vitest run tests/api-rebalance.test.ts tests/api-emergency.test.ts && npx vitest run tests/api-funds.test.ts",
+      "inputs": [
+        "`src/api/server.ts` — createServer() factory from T01 to register new route plugins",
+        "`src/api/routes/funds.ts` — fund routes pattern to follow for consistency",
+        "`src/api/schemas/funds.ts` — schema pattern to follow",
+        "`src/alvara/rebalance.ts` — rebalanceBSKT() function and RebalanceMode enum",
+        "`src/alvara/emergency.ts` — emergencyStables() and emergencyRevert() functions and their option/result types",
+        "`src/db/fund-repository.ts` — getFundById, createPipelineRun, updatePipelineRun for snapshot persistence",
+        "`tests/api-funds.test.ts` — test pattern established in T01 (mock setup, inject pattern)"
+      ],
+      "expected_output": [
+        "`src/api/routes/rebalance.ts` — POST /funds/:id/rebalance route plugin",
+        "`src/api/routes/emergency.ts` — POST /funds/:id/emergency and /revert route plugins",
+        "`src/api/schemas/rebalance.ts` — JSON Schema for rebalance request/response",
+        "`src/api/schemas/emergency.ts` — JSON Schema for emergency request/response",
+        "`src/api/server.ts` — updated with rebalance and emergency route registration",
+        "`tests/api-rebalance.test.ts` — fastify.inject() tests for rebalance routes",
+        "`tests/api-emergency.test.ts` — fastify.inject() tests for emergency routes"
+      ],
+      "observability_impact": "",
+      "full_plan_md": "",
+      "sequence": 0
     }
   ],
   "decisions": [
@@ -2227,6 +2336,30 @@
       "choice": "Checkpoint guards within the linear flow (if-already-done skip pattern) rather than refactoring each phase into separate callable functions",
       "rationale": "Preserves the linear pipeline structure established in M001/S06 (480-line outbound.ts). Each phase gets an if/else guard: if checkpoint says done, restore data from metadata; else run phase normally and write checkpoint after. Lower-risk change than extracting 5 phase functions, and the linear flow is easier to follow for debugging. The pipelineRuns.metadata JSONB field already exists — no schema change needed for checkpoint storage.",
       "revisable": "Yes — if the file exceeds ~700 lines, extract phase functions",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 35,
+      "id": "D035",
+      "when_context": "",
+      "scope": "requirement",
+      "decision": "R009 — On-chain divestment config verifiability",
+      "choice": "advanced (active → partially validated)",
+      "rationale": "S04 delivers DivestmentRegistry.sol with immutable one-shot registration, TypeScript client with registerConfig/getConfig, and integration tests proving the full flow on anvil (deploy → register → read from different wallet → overwrite reverts). Gas at 161k. Public verifiability proven in integration test. Full validation requires deployment to Base/Ethereum mainnet with real fund registration.",
+      "revisable": "Yes",
+      "made_by": "agent",
+      "superseded_by": null
+    },
+    {
+      "seq": 36,
+      "id": "D036",
+      "when_context": "M002/S05",
+      "scope": "architecture",
+      "decision": "Emergency snapshot persistence for REST API",
+      "choice": "Persist emergency snapshots in pipeline_runs.metadata JSONB field — no new table or schema migration",
+      "rationale": "The pipeline_runs table already has a JSONB metadata field used for checkpoint persistence (S02). Storing emergency snapshots there (with type: 'emergency_snapshot' discriminator) avoids a schema migration and follows the established pattern. The POST /emergency/revert endpoint reads the latest snapshot from DB, with a fallback to request body for manual overrides. Keeps the approach consistent with S03's forward intelligence noting that S05 would add DB persistence.",
+      "revisable": "Yes — if snapshot queries become complex, a dedicated table may be warranted",
       "made_by": "agent",
       "superseded_by": null
     }
@@ -3034,6 +3167,28 @@
       "verdict": "✅ pass",
       "duration_ms": 100,
       "created_at": "2026-04-07T19:30:46.554Z"
+    },
+    {
+      "id": 74,
+      "task_id": "T01",
+      "slice_id": "S05",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/api-funds.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 17700,
+      "created_at": "2026-04-07T19:45:59.361Z"
+    },
+    {
+      "id": 75,
+      "task_id": "T01",
+      "slice_id": "S05",
+      "milestone_id": "M002",
+      "command": "node -e \"import('fastify').then(() => console.log('fastify importable'))\"",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 1000,
+      "created_at": "2026-04-07T19:45:59.361Z"
     }
   ]
 }
