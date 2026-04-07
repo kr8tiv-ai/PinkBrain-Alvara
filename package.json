@@ -1,0 +1,19 @@
+{
+  "name": "pinkbrain-alvara",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "discover": "tsx scripts/discover-factory.ts",
+    "create-bskt": "tsx scripts/create-bskt.ts",
+    "verify-bskt": "tsx scripts/verify-bskt.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
