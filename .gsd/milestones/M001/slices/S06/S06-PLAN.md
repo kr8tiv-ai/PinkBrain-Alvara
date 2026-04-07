@@ -60,7 +60,7 @@
   - Estimate: 1h30m
   - Files: src/pipeline/types.ts, src/pipeline/outbound.ts, src/config/solana.ts
   - Verify: npx tsc --noEmit 2>&1 | grep -v "discover-factory\|jupiter-swap.ts\|bags-fee-share.test" | grep -c "error TS" || echo 0 — must be 0 new errors from src/pipeline/ files
-- [ ] **T02: Add unit tests for outbound pipeline with mocked subsystems** — Create comprehensive unit tests for the outbound pipeline orchestrator, mocking all subsystem functions to verify orchestration logic, phase transitions, fee calculation, error handling, and fund validation.
+- [x] **T02: Added 20 unit tests for outbound pipeline with fully mocked subsystems — all passing** — Create comprehensive unit tests for the outbound pipeline orchestrator, mocking all subsystem functions to verify orchestration logic, phase transitions, fee calculation, error handling, and fund validation.
 
 ## Steps
 
