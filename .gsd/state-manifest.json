@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T19:26:00.910Z",
+  "exported_at": "2026-04-07T19:30:46.731Z",
   "milestones": [
     {
       "id": "M001",
@@ -1773,19 +1773,27 @@
       "milestone_id": "M002",
       "slice_id": "S04",
       "id": "T03",
-      "title": "Write deploy script and anvil integration test proving full registry flow",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Wrote reusable deploy helper, CLI deploy script with --chain/--rpc-url flags, and 6 anvil integration tests with graceful skip",
+      "status": "complete",
+      "one_liner": "Wrote reusable deploy helper, CLI deploy script with --chain/--rpc-url flags, and 6 anvil integration tests with graceful skip",
+      "narrative": "Created src/registry/deploy.ts with deployRegistry() and loadBytecode() that reads bytecode from Foundry artifacts. Created scripts/deploy-registry.ts as a CLI tool accepting --chain base|ethereum, --rpc-url, and --help flags with structured JSON output. Created tests/registry-integration.test.ts with 6 integration tests covering deploy, register, read-back, public verifiability, overwrite-revert, gas check, and null-for-unregistered — all with graceful skip when anvil is unavailable. Updated src/registry/index.ts barrel exports to include deploy functions.",
+      "verification_result": "Deploy script --help exits 0 with correct usage text. Integration test suite exits 0 with 6 graceful skips (anvil not on Windows). Unit tests still pass (15/15). All expected files exist. createEthereumClient confirmed in chains.ts.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T19:30:46.553Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None. Previous verification failure was grep not being available on Windows — not a code issue.",
+      "known_issues": "Anvil and Forge not installed on Windows dev machine — integration tests skip gracefully. Full integration proof requires Foundry toolchain.",
+      "key_files": [
+        "src/registry/deploy.ts",
+        "scripts/deploy-registry.ts",
+        "tests/registry-integration.test.ts",
+        "src/registry/index.ts"
+      ],
+      "key_decisions": [
+        "loadBytecode reads Foundry artifact at runtime — no bytecode committed to TS source",
+        "Integration test uses random port to avoid collision with other anvil instances"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S04\nmilestone: M002\nkey_files:\n  - src/registry/deploy.ts\n  - scripts/deploy-registry.ts\n  - tests/registry-integration.test.ts\n  - src/registry/index.ts\nkey_decisions:\n  - loadBytecode reads Foundry artifact at runtime — no bytecode committed to TS source\n  - Integration test uses random port to avoid collision with other anvil instances\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:30:46.553Z\nblocker_discovered: false\n---\n\n# T03: Wrote reusable deploy helper, CLI deploy script with --chain/--rpc-url flags, and 6 anvil integration tests with graceful skip\n\n**Wrote reusable deploy helper, CLI deploy script with --chain/--rpc-url flags, and 6 anvil integration tests with graceful skip**\n\n## What Happened\n\nCreated src/registry/deploy.ts with deployRegistry() and loadBytecode() that reads bytecode from Foundry artifacts. Created scripts/deploy-registry.ts as a CLI tool accepting --chain base|ethereum, --rpc-url, and --help flags with structured JSON output. Created tests/registry-integration.test.ts with 6 integration tests covering deploy, register, read-back, public verifiability, overwrite-revert, gas check, and null-for-unregistered — all with graceful skip when anvil is unavailable. Updated src/registry/index.ts barrel exports to include deploy functions.\n\n## Verification\n\nDeploy script --help exits 0 with correct usage text. Integration test suite exits 0 with 6 graceful skips (anvil not on Windows). Unit tests still pass (15/15). All expected files exist. createEthereumClient confirmed in chains.ts.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx tsx scripts/deploy-registry.ts --help` | 0 | ✅ pass | 19400ms |\n| 2 | `npx vitest run tests/registry-integration.test.ts` | 0 | ✅ pass (6 skipped) | 21500ms |\n| 3 | `npx vitest run tests/divestment-registry.test.ts tests/registry-integration.test.ts` | 0 | ✅ pass (15 passed, 6 skipped) | 21900ms |\n| 4 | `test -f src/registry/deploy.ts` | 0 | ✅ pass | 100ms |\n| 5 | `test -f src/config/divestment-registry-abi.json` | 0 | ✅ pass | 100ms |\n\n## Deviations\n\nNone. Previous verification failure was grep not being available on Windows — not a code issue.\n\n## Known Issues\n\nAnvil and Forge not installed on Windows dev machine — integration tests skip gracefully. Full integration proof requires Foundry toolchain.\n\n## Files Created/Modified\n\n- `src/registry/deploy.ts`\n- `scripts/deploy-registry.ts`\n- `tests/registry-integration.test.ts`\n- `src/registry/index.ts`\n",
       "description": "Write a viem-based deployment script for DivestmentRegistry and an integration test using Foundry's anvil (local EVM) that proves the full flow: deploy → register → read back → overwrite reverts → gas check. This is the slice's integration proof.\n\n## Steps\n\n1. Write `scripts/deploy-registry.ts`:\n   - Accept `--chain base|ethereum` and `--rpc-url` flags (use parseArgs or simple argv parsing)\n   - Load deployer private key from `DEPLOYER_PRIVATE_KEY` env var\n   - Use viem's `deployContract()` with the ABI + bytecode from the compiled Foundry artifact\n   - Load bytecode from `contracts/out/DivestmentRegistry.sol/DivestmentRegistry.json` (the `bytecode.object` field)\n   - Wait for deployment receipt, log deployed address\n   - Output: `{ chain, address, txHash, gasUsed, deployer }` as structured JSON\n   - Graceful error if env var missing: print usage and exit 1\n2. Write `tests/registry-integration.test.ts`:\n   - `beforeAll`: check if `anvil` is available (`which anvil`), `ctx.skip()` if not (same graceful-skip pattern as fund-repository.test.ts per K012)\n   - `beforeAll`: start anvil on a random port, create viem clients pointed at it\n   - Test: deploy DivestmentRegistry via the deployment helper (extract deploy logic into a shared function)\n   - Test: register a config with known UUID, read it back, verify all fields match\n   - Test: read config from a different account (publicClient only) — same result (public verifiability, R009)\n   - Test: attempt to register same fundId again — verify it reverts with AlreadyRegistered\n   - Test: verify gas used for registration is < 500k\n   - `afterAll`: kill anvil process\n3. Extract the deploy logic from the script into a reusable function in `src/registry/deploy.ts`:\n   - `deployRegistry(walletClient, publicClient): Promise<{address, txHash, gasUsed}>`\n   - Both the CLI script and integration test use this function\n   - Load bytecode from Foundry output artifact\n4. Update `src/registry/index.ts` to also export deploy function.\n\n## Must-Haves\n\n- [ ] Deploy script works with `--chain base` and `--chain ethereum` flags\n- [ ] Integration test deploys to anvil and exercises full register → read → overwrite-revert flow\n- [ ] Gas verification: registration < 500k gas (asserted in integration test)\n- [ ] Graceful skip when anvil is unavailable (vitest exits 0)\n- [ ] Deploy helper is reusable (not just a script)\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| anvil process | ctx.skip() — test suite skips gracefully | 10s startup timeout → skip | N/A |\n| Foundry artifacts | Error if bytecode file missing — clear message pointing to `forge build` | N/A | JSON parse error with file path in message |\n\n## Verification\n\n- `npx vitest run tests/registry-integration.test.ts` — passes (or skips gracefully if anvil unavailable)\n- `npx tsx scripts/deploy-registry.ts --help` — prints usage without crashing\n- `test -f src/registry/deploy.ts` — deploy helper exists",
       "estimate": "1.5h",
       "files": [
@@ -2971,6 +2979,61 @@
       "verdict": "✅ pass",
       "duration_ms": 50,
       "created_at": "2026-04-07T19:26:00.871Z"
+    },
+    {
+      "id": 69,
+      "task_id": "T03",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "npx tsx scripts/deploy-registry.ts --help",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 19400,
+      "created_at": "2026-04-07T19:30:46.553Z"
+    },
+    {
+      "id": 70,
+      "task_id": "T03",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/registry-integration.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass (6 skipped)",
+      "duration_ms": 21500,
+      "created_at": "2026-04-07T19:30:46.553Z"
+    },
+    {
+      "id": 71,
+      "task_id": "T03",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/divestment-registry.test.ts tests/registry-integration.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass (15 passed, 6 skipped)",
+      "duration_ms": 21900,
+      "created_at": "2026-04-07T19:30:46.553Z"
+    },
+    {
+      "id": 72,
+      "task_id": "T03",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "test -f src/registry/deploy.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T19:30:46.554Z"
+    },
+    {
+      "id": 73,
+      "task_id": "T03",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "test -f src/config/divestment-registry-abi.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T19:30:46.554Z"
     }
   ]
 }

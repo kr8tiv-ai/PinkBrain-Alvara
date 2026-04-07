@@ -16,3 +16,9 @@ export {
   type OnChainDivestmentConfig,
   type RegisterConfigParams,
 } from './types.js';
+
+export {
+  deployRegistry,
+  loadBytecode,
+  type DeployResult,
+} from './deploy.js';
