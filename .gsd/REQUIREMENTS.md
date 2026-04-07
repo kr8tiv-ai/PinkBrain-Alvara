@@ -34,7 +34,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M002/S02
 - Supporting slices: M001/S03, M002/S01
-- Validation: unmapped
+- Validation: M002/S02: Accumulation scheduler polls active funds on cron, checks SOL balance against configurable threshold (default 5 SOL), dispatches 5-phase pipeline (claim→swap→fee→bridge→invest) with checkpoint recovery and per-fund error isolation. 9 scheduler tests + 57 total S02 tests. Concurrency guard prevents double dispatch. Live pipeline not exercised — mocked.
 - Notes: Scheduled job checks every 6 hours. Threshold configurable per fund at setup.
 
 ### R004 — Swap accumulated SOL reflections to USDC on Solana via Jupiter Aggregator before bridging
@@ -78,7 +78,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M002/S03
 - Supporting slices: M002/S01
-- Validation: unmapped
+- Validation: M002/S03: rebalanceBSKT() orchestration — ownership check, backend-signed routes via getRebalanceRoutes(), gas estimate, tx with BSKTRebalanced event parsing, LP verification. CLI script with --new-tokens/--new-weights/--mode/--dry-run. 14 unit tests. Live BSKT rebalance not yet exercised.
 - Notes: Two separate on-chain transactions. MEV-protected via Alvara's backend signing. Owner can only change composition, not divestment config.
 
 ### R009 — The divestment split (% to holders vs % to owner) and trigger conditions are stored on-chain so anyone can verify
@@ -89,7 +89,7 @@ This file is the explicit capability and coverage contract for the project.
 - Source: user
 - Primary owning slice: M002/S04
 - Supporting slices: M001/S05, M002/S05
-- Validation: unmapped
+- Validation: M002/S04: DivestmentRegistry.sol with immutable one-shot registration, custom errors (AlreadyRegistered, InvalidSplitBps), 12 Forge tests. TypeScript client with registerConfig/getConfig. Integration test on Anvil proves full lifecycle: deploy → register → read from different wallet → overwrite reverts. Gas: 161k (well under 500k). Not yet deployed to Base/Ethereum mainnet.
 - Notes: Custom config registry contract on EVM side. Stores: recipient split (basis points), trigger type (time/threshold/both), trigger params, distribution currency choice.
 
 ### R010 — Fund auto-liquidates based on configured triggers: time-based schedule, value threshold, or both. Locked at setup.
@@ -368,13 +368,13 @@ This file is the explicit capability and coverage contract for the project.
 |---|---|---|---|---|---|
 | R001 | core-capability | active | M001/S05 | M002/S01, M003/S01 | M001/S05: Fund creation with UUID PK, treasury wallet reference, protocolFeeBps field. Schema, repository CRUD, and state machine implemented. Awaits M002 for full end-to-end fund lifecycle. |
 | R002 | core-capability | active | M001/S03 | M002/S01 | M001/S03: Complete programmatic interface — getAdminTokenList, buildUpdateConfigTransaction (basis points validation), getClaimTransactions, signAndSendClaimTransactions. 42 unit tests, dry-run CLI proof. Awaits live API key validation. |
-| R003 | primary-user-loop | active | M002/S02 | M001/S03, M002/S01 | unmapped |
+| R003 | primary-user-loop | active | M002/S02 | M001/S03, M002/S01 | M002/S02: Accumulation scheduler polls active funds on cron, checks SOL balance against configurable threshold (default 5 SOL), dispatches 5-phase pipeline (claim→swap→fee→bridge→invest) with checkpoint recovery and per-fund error isolation. 9 scheduler tests + 57 total S02 tests. Concurrency guard prevents double dispatch. Live pipeline not exercised — mocked. |
 | R004 | core-capability | active | M001/S04 | M002/S01 | M001/S04: Jupiter Ultra V3 swap module (getSwapOrder, executeSwap, swapSolToUsdc). Live API proof: 0.01 SOL → 0.80 USDC quote. 24 unit tests. Integrated in S06 outbound pipeline. |
 | R005 | core-capability | active | M001/S02 | M002/S01 | M001/S02: Typed deBridge DLN client with Solana tx preparation pipeline. Live estimate-only dry-run: 0.20 USDC Solana→Base. 37 unit tests. Full bridge pipeline implemented but not exercised with real funds. Integrated in S06 outbound pipeline. |
 | R006 | core-capability | validated | M001/S01 | none | S01/T01: Factory discovered at 0x9ee08080 on Base via deployer interaction scanning. Full ABI (93 entries), proxy detection, and machine-readable config in discovered-contracts.json. |
 | R007 | core-capability | active | M001/S01 | M002/S02 | S01/T02: Factory interface proven (createBSKT signature, full ABI). MEV analysis of 5 on-chain txs confirms backend-signed swap routes required — direct creation without Alvara's signing API will revert with InvalidSignature. Integration path documented in mev-findings.json. Capability achievable but requires Alvara backend API integration, not just direct contract calls. |
-| R008 | core-capability | active | M002/S03 | M002/S01 | unmapped |
-| R009 | core-capability | active | M002/S04 | M001/S05, M002/S05 | unmapped |
+| R008 | core-capability | active | M002/S03 | M002/S01 | M002/S03: rebalanceBSKT() orchestration — ownership check, backend-signed routes via getRebalanceRoutes(), gas estimate, tx with BSKTRebalanced event parsing, LP verification. CLI script with --new-tokens/--new-weights/--mode/--dry-run. 14 unit tests. Live BSKT rebalance not yet exercised. |
+| R009 | core-capability | active | M002/S04 | M001/S05, M002/S05 | M002/S04: DivestmentRegistry.sol with immutable one-shot registration, custom errors (AlreadyRegistered, InvalidSplitBps), 12 Forge tests. TypeScript client with registerConfig/getConfig. Integration test on Anvil proves full lifecycle: deploy → register → read from different wallet → overwrite reverts. Gas: 161k (well under 500k). Not yet deployed to Base/Ethereum mainnet. |
 | R010 | primary-user-loop | active | M003/S01 | M001/S05 | unmapped |
 | R011 | core-capability | active | M003/S01 | none | unmapped |
 | R012 | core-capability | active | M003/S02 | none | unmapped |
