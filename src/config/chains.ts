@@ -1,7 +1,7 @@
 import { createPublicClient, http, type Address } from 'viem';
-import { base } from 'viem/chains';
+import { base, mainnet } from 'viem/chains';
 
-export { base };
+export { base, mainnet };
 
 /** Known contract/token addresses on Base */
 export const KNOWN_ADDRESSES = {
@@ -42,6 +42,36 @@ export function createBaseClient(rpcIndex = 0) {
   const rpcUrl = BASE_RPCS[rpcIndex] ?? BASE_RPCS[0];
   return createPublicClient({
     chain: base,
+    transport: http(rpcUrl, { timeout: 15_000, retryCount: 2 }),
+  });
+}
+
+// ── Ethereum Mainnet ────────────────────────────────────────────────────
+
+/** Known contract/token addresses on Ethereum mainnet */
+export const ETHEREUM_KNOWN_ADDRESSES = {
+  /** USDC on Ethereum */
+  USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address,
+  /** WETH on Ethereum */
+  WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address,
+  /** USDT on Ethereum */
+  USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7' as Address,
+} as const;
+
+/** Ethereum mainnet RPC endpoints — primary + fallback */
+const ETH_RPCS = [
+  'https://eth.drpc.org',
+  'https://rpc.ankr.com/eth',
+  'https://cloudflare-eth.com',
+];
+
+/**
+ * Create a public client for Ethereum mainnet. Falls back through RPC endpoints.
+ */
+export function createEthereumClient(rpcIndex = 0) {
+  const rpcUrl = ETH_RPCS[rpcIndex] ?? ETH_RPCS[0];
+  return createPublicClient({
+    chain: mainnet,
     transport: http(rpcUrl, { timeout: 15_000, retryCount: 2 }),
   });
 }

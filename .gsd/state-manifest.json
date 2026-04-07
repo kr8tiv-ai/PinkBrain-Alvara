@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T19:22:08.084Z",
+  "exported_at": "2026-04-07T19:26:00.910Z",
   "milestones": [
     {
       "id": "M001",
@@ -1718,19 +1718,29 @@
       "milestone_id": "M002",
       "slice_id": "S04",
       "id": "T02",
-      "title": "Build TypeScript registry client with Ethereum chain config and unit tests",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built DivestmentRegistry TypeScript client with registerConfig/getConfig/encode-decode helpers, added Ethereum mainnet chain config, and wrote 15 passing vitest unit tests",
+      "status": "complete",
+      "one_liner": "Built DivestmentRegistry TypeScript client with registerConfig/getConfig/encode-decode helpers, added Ethereum mainnet chain config, and wrote 15 passing vitest unit tests",
+      "narrative": "Created the full TypeScript client for DivestmentRegistry contract interaction following the injected-client pattern from contribute.ts. The client provides fundIdToBytes32 for deterministic UUID→bytes32 key derivation, encodeTriggerParams/decodeTriggerParams for ABI-encoding trigger params per type (Time, Threshold, Both), registerConfig for writing immutable configs on-chain, and getConfig for reading configs (returning null for unregistered funds). Added Ethereum mainnet chain config to chains.ts with createEthereumClient(), ETHEREUM_KNOWN_ADDRESSES, and ETH_RPCS. Types module defines TriggerType enum, OnChainDivestmentConfig interface, and RegisterConfigParams. All 15 vitest unit tests pass covering determinism, roundtrip encoding, contract call correctness, revert handling, and null returns.",
+      "verification_result": "npx vitest run tests/divestment-registry.test.ts — 15/15 tests pass. grep confirms createEthereumClient in chains.ts. ABI file exists from T01.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T19:26:00.871Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/registry/client.ts",
+        "src/registry/types.ts",
+        "src/registry/index.ts",
+        "src/config/chains.ts",
+        "tests/divestment-registry.test.ts"
+      ],
+      "key_decisions": [
+        "Client does not duplicate on-chain BPS validation — contract enforces via InvalidSplitBps revert",
+        "fundIdToBytes32 uses keccak256(toHex(uuid)) for deterministic key derivation",
+        "getConfig checks registered() before getConfig() to return null for unregistered funds"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S04\nmilestone: M002\nkey_files:\n  - src/registry/client.ts\n  - src/registry/types.ts\n  - src/registry/index.ts\n  - src/config/chains.ts\n  - tests/divestment-registry.test.ts\nkey_decisions:\n  - Client does not duplicate on-chain BPS validation — contract enforces via InvalidSplitBps revert\n  - fundIdToBytes32 uses keccak256(toHex(uuid)) for deterministic key derivation\n  - getConfig checks registered() before getConfig() to return null for unregistered funds\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:26:00.870Z\nblocker_discovered: false\n---\n\n# T02: Built DivestmentRegistry TypeScript client with registerConfig/getConfig/encode-decode helpers, added Ethereum mainnet chain config, and wrote 15 passing vitest unit tests\n\n**Built DivestmentRegistry TypeScript client with registerConfig/getConfig/encode-decode helpers, added Ethereum mainnet chain config, and wrote 15 passing vitest unit tests**\n\n## What Happened\n\nCreated the full TypeScript client for DivestmentRegistry contract interaction following the injected-client pattern from contribute.ts. The client provides fundIdToBytes32 for deterministic UUID→bytes32 key derivation, encodeTriggerParams/decodeTriggerParams for ABI-encoding trigger params per type (Time, Threshold, Both), registerConfig for writing immutable configs on-chain, and getConfig for reading configs (returning null for unregistered funds). Added Ethereum mainnet chain config to chains.ts with createEthereumClient(), ETHEREUM_KNOWN_ADDRESSES, and ETH_RPCS. Types module defines TriggerType enum, OnChainDivestmentConfig interface, and RegisterConfigParams. All 15 vitest unit tests pass covering determinism, roundtrip encoding, contract call correctness, revert handling, and null returns.\n\n## Verification\n\nnpx vitest run tests/divestment-registry.test.ts — 15/15 tests pass. grep confirms createEthereumClient in chains.ts. ABI file exists from T01.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/divestment-registry.test.ts` | 0 | ✅ pass | 4490ms |\n| 2 | `grep -q 'createEthereumClient' src/config/chains.ts` | 0 | ✅ pass | 100ms |\n| 3 | `test -f src/config/divestment-registry-abi.json` | 0 | ✅ pass | 50ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/registry/client.ts`\n- `src/registry/types.ts`\n- `src/registry/index.ts`\n- `src/config/chains.ts`\n- `tests/divestment-registry.test.ts`\n",
       "description": "Create the TypeScript client that wraps viem calls for DivestmentRegistry interaction, add Ethereum chain config to support dual-chain deployment (R021), and write comprehensive vitest unit tests with mocked viem.\n\n## Steps\n\n1. Add Ethereum chain config to `src/config/chains.ts`:\n   - Import `mainnet` from `viem/chains`\n   - Add `ETHEREUM_KNOWN_ADDRESSES` with USDC, WETH, USDT addresses on Ethereum mainnet\n   - Add `ETH_RPCS` array (drpc.org primary, public fallback)\n   - Add `createEthereumClient(rpcIndex?)` following the same pattern as `createBaseClient()`\n   - Export the new chain and factory alongside existing Base exports\n2. Create `src/registry/types.ts`:\n   - `OnChainDivestmentConfig` interface matching the Solidity struct fields (TypeScript types)\n   - `RegisterConfigParams` — input type for registerConfig()\n   - `TriggerType` enum: Time=0, Threshold=1, Both=2\n   - Re-export relevant viem types used by the client\n3. Create `src/registry/client.ts`:\n   - `fundIdToBytes32(uuid: string): Hex` — `keccak256(toHex(uuid))` to convert PostgreSQL UUID to on-chain key\n   - `encodeTriggerParams(triggerType: TriggerType, params: Record<string, unknown>): Hex` — ABI-encode trigger params per type:\n     - Time: `encodeAbiParameters([{type:'uint256'}], [timeMs])` \n     - Threshold: `encodeAbiParameters([{type:'uint256'}], [thresholdUsd])`\n     - Both: `encodeAbiParameters([{type:'uint256'},{type:'uint256'}], [timeMs, thresholdUsd])`\n   - `decodeTriggerParams(triggerType: number, data: Hex): Record<string, unknown>` — reverse of encode\n   - `registerConfig(walletClient, publicClient, registryAddress, params: RegisterConfigParams): Promise<{txHash, gasUsed}>` — sends registerConfig tx, waits for receipt, returns hash + gas\n   - `getConfig(publicClient, registryAddress, fundId: string): Promise<OnChainDivestmentConfig | null>` — reads config, returns null if not registered\n   - Load ABI from `src/config/divestment-registry-abi.json`\n   - Follow the injected client pattern from `src/alvara/contribute.ts` (walletClient + publicClient as params)\n   - Structured logging: `{ ts, module: 'registry', action, fundId, chain, txHash }`\n4. Create `src/registry/index.ts` — barrel export for client and types.\n5. Write `tests/divestment-registry.test.ts`:\n   - Test fundIdToBytes32 produces deterministic bytes32 for known UUIDs\n   - Test encodeTriggerParams/decodeTriggerParams roundtrip for each trigger type\n   - Test registerConfig calls writeContract with correct args (mock walletClient + publicClient)\n   - Test getConfig calls readContract and maps result correctly\n   - Test getConfig returns null for unregistered fund\n   - Test InvalidSplitBps validation (if client-side validation is added)\n   - Use vi.mock() pattern consistent with existing tests\n\n## Must-Haves\n\n- [ ] `createEthereumClient()` exists in chains.ts and works (R021 support)\n- [ ] fundIdToBytes32 is deterministic — same UUID always produces same bytes32\n- [ ] encodeTriggerParams/decodeTriggerParams roundtrip correctly for all trigger types\n- [ ] registerConfig follows injected-client pattern (walletClient + publicClient params)\n- [ ] All vitest tests pass\n\n## Verification\n\n- `npx vitest run tests/divestment-registry.test.ts` — all tests pass\n- `grep -q 'createEthereumClient' src/config/chains.ts` — Ethereum config exists",
       "estimate": "1.5h",
       "files": [
@@ -2928,6 +2938,39 @@
       "verdict": "✅ pass",
       "duration_ms": 100,
       "created_at": "2026-04-07T19:22:08.014Z"
+    },
+    {
+      "id": 66,
+      "task_id": "T02",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/divestment-registry.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 4490,
+      "created_at": "2026-04-07T19:26:00.871Z"
+    },
+    {
+      "id": 67,
+      "task_id": "T02",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "grep -q 'createEthereumClient' src/config/chains.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T19:26:00.871Z"
+    },
+    {
+      "id": 68,
+      "task_id": "T02",
+      "slice_id": "S04",
+      "milestone_id": "M002",
+      "command": "test -f src/config/divestment-registry-abi.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 50,
+      "created_at": "2026-04-07T19:26:00.871Z"
     }
   ]
 }
