@@ -13,6 +13,6 @@
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "scripts/**/*", "tests/**/*", "vitest.config.ts"],
+  "include": ["src/**/*", "scripts/**/*", "tests/**/*", "vitest.config.ts", "drizzle.config.ts"],
   "exclude": ["node_modules", "dist"]
 }
