@@ -133,6 +133,7 @@ export async function runOutboundPipeline(
     feeTransfer: null,
     bridgeSend: null,
     bridgeReceive: null,
+    investTxHash: null,
   };
 
   log('pipeline', 'start', { fundId });
@@ -265,6 +266,7 @@ export async function runOutboundPipeline(
         feeDeducted: '0',
         amountBridged: '0',
         bridgeOrderId: '',
+        amountInvested: '0',
         durationMs: Date.now() - startTime,
       };
     }
@@ -448,6 +450,7 @@ export async function runOutboundPipeline(
       feeDeducted: feeAmount.toString(),
       amountBridged: bridgeAmount.toString(),
       bridgeOrderId: bridgeOrder.orderId,
+      amountInvested: '0',
       durationMs: Date.now() - startTime,
     };
 

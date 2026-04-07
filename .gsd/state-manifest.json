@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T17:48:05.486Z",
+  "exported_at": "2026-04-07T17:54:01.010Z",
   "milestones": [
     {
       "id": "M001",
@@ -1251,19 +1251,29 @@
       "milestone_id": "M002",
       "slice_id": "S01",
       "id": "T03",
-      "title": "Build contribute-to-BSKT flow with CLI and unit tests",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built contributeToBSKT() orchestration, CLI script with --dry-run, 13 unit tests, and extended pipeline types with investTxHash/amountInvested for S02",
+      "status": "complete",
+      "one_liner": "Built contributeToBSKT() orchestration, CLI script with --dry-run, 13 unit tests, and extended pipeline types with investTxHash/amountInvested for S02",
+      "narrative": "Wired Alvara API client (T02) and BSKTPair module (T01) into a complete contribute-to-BSKT flow in src/alvara/contribute.ts. The flow resolves BSKTPair address, reads LP balance before, fetches backend-signed swap routes, estimates gas, sends contribute() with 10% buffer, waits for confirmation, and verifies LP balance increased. Created CLI script with --bskt-address, --amount, --dry-run flags. Wrote 13 unit tests covering happy path, dry run, API failure, gas estimation failure, tx revert, LP non-increase warning, gas buffer, and args correctness. Extended PipelineTxHashes with investTxHash and OutboundPipelineResult with amountInvested, updating outbound.ts literals for backward compatibility.",
+      "verification_result": "npx vitest run tests/alvara-contribute.test.ts — 13/13 pass. test -f scripts/contribute-bskt.ts — exists. node -e investTxHash check — present. npx vitest run tests/outbound-pipeline.test.ts — 20/20 pass (backward-compatible).",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T17:54:00.960Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Added investTxHash:null and amountInvested:'0' to both result object literals in src/pipeline/outbound.ts — required to keep TypeScript and existing tests passing after extending the types.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/alvara/contribute.ts",
+        "scripts/contribute-bskt.ts",
+        "tests/alvara-contribute.test.ts",
+        "src/pipeline/types.ts",
+        "src/pipeline/outbound.ts"
+      ],
+      "key_decisions": [
+        "contribute() called on BSKT NFT using bskt-logic-abi.json, not BSKTPair",
+        "LP non-increase after successful tx logs warning but does not throw",
+        "Updated outbound.ts literals with default investTxHash:null and amountInvested:'0' for backward compatibility"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S01\nmilestone: M002\nkey_files:\n  - src/alvara/contribute.ts\n  - scripts/contribute-bskt.ts\n  - tests/alvara-contribute.test.ts\n  - src/pipeline/types.ts\n  - src/pipeline/outbound.ts\nkey_decisions:\n  - contribute() called on BSKT NFT using bskt-logic-abi.json, not BSKTPair\n  - LP non-increase after successful tx logs warning but does not throw\n  - Updated outbound.ts literals with default investTxHash:null and amountInvested:'0' for backward compatibility\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T17:54:00.959Z\nblocker_discovered: false\n---\n\n# T03: Built contributeToBSKT() orchestration, CLI script with --dry-run, 13 unit tests, and extended pipeline types with investTxHash/amountInvested for S02\n\n**Built contributeToBSKT() orchestration, CLI script with --dry-run, 13 unit tests, and extended pipeline types with investTxHash/amountInvested for S02**\n\n## What Happened\n\nWired Alvara API client (T02) and BSKTPair module (T01) into a complete contribute-to-BSKT flow in src/alvara/contribute.ts. The flow resolves BSKTPair address, reads LP balance before, fetches backend-signed swap routes, estimates gas, sends contribute() with 10% buffer, waits for confirmation, and verifies LP balance increased. Created CLI script with --bskt-address, --amount, --dry-run flags. Wrote 13 unit tests covering happy path, dry run, API failure, gas estimation failure, tx revert, LP non-increase warning, gas buffer, and args correctness. Extended PipelineTxHashes with investTxHash and OutboundPipelineResult with amountInvested, updating outbound.ts literals for backward compatibility.\n\n## Verification\n\nnpx vitest run tests/alvara-contribute.test.ts — 13/13 pass. test -f scripts/contribute-bskt.ts — exists. node -e investTxHash check — present. npx vitest run tests/outbound-pipeline.test.ts — 20/20 pass (backward-compatible).\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/alvara-contribute.test.ts` | 0 | ✅ pass | 10200ms |\n| 2 | `test -f scripts/contribute-bskt.ts` | 0 | ✅ pass | 100ms |\n| 3 | `node -e investTxHash check` | 0 | ✅ pass | 100ms |\n| 4 | `npx vitest run tests/outbound-pipeline.test.ts` | 0 | ✅ pass | 5900ms |\n\n## Deviations\n\nAdded investTxHash:null and amountInvested:'0' to both result object literals in src/pipeline/outbound.ts — required to keep TypeScript and existing tests passing after extending the types.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/alvara/contribute.ts`\n- `scripts/contribute-bskt.ts`\n- `tests/alvara-contribute.test.ts`\n- `src/pipeline/types.ts`\n- `src/pipeline/outbound.ts`\n",
       "description": "Wire the Alvara API client (T02) and BSKTPair contract (T01) into a complete contribute-to-BSKT flow, with a CLI script and comprehensive tests.\n\n**Why:** This is the slice's demo deliverable — proving we can take ETH on Base, get backend-signed routes, call contribute() on a real BSKT, and verify LP balance changed. This also proves the API client works for S03 rebalancing.\n\n**Steps:**\n1. Create `src/alvara/contribute.ts` with:\n   - `contributeToBSKT(opts)` — full contribute flow: validate BSKT exists → get signed routes from API → execute contribute() transaction → verify LP balance\n   - `ContributeOptions` type: publicClient, walletClient, bsktAddress, ethAmount, apiClient\n   - `ContributeResult` type: txHash, receipt, lpBalanceBefore, lpBalanceAfter, gasUsed\n   - Structured logging at each phase (api_call, tx_send, tx_confirm, lp_verify)\n2. Create `scripts/contribute-bskt.ts` CLI script:\n   - `--bskt-address` (required): target BSKT address\n   - `--amount` (required): ETH amount to contribute\n   - `--dry-run` (optional): only fetch routes and estimate gas, don't send tx\n   - Loads private key from `PRIVATE_KEY` env var\n   - Outputs structured JSON result\n3. Write `tests/alvara-contribute.test.ts`:\n   - Mock both API client and viem contract calls\n   - Test happy path: contribute succeeds, LP balance increases\n   - Test error paths: API failure, contract revert, BSKT not found\n   - Test dry-run mode (no tx sent)\n   - Test gas estimation and buffer logic\n4. Extend `src/pipeline/types.ts`:\n   - Add `investTxHash: string | null` to PipelineTxHashes\n   - Add `amountInvested: string` to OutboundPipelineResult\n   - This prepares S02 to wire contribute into the automated pipeline\n5. Update `src/db/schema.ts` — verify `investing` is already in pipelinePhaseEnum (it is) and `bskt_create` is in operationEnum (it is).\n\n**Constraints:**\n- contribute() is likely payable (ETH as msg.value) based on D032 — verify from BSKTPair ABI.\n- If the BSKTPair ABI from T01 reveals contribute expects ERC-20 tokens instead of ETH, adjust the flow accordingly and document the deviation.\n- Use the established gas estimation + 10% buffer pattern from factory.ts.\n- Never log private keys or wallet balances in plain text.",
       "estimate": "2h",
       "files": [
@@ -2121,6 +2131,50 @@
       "verdict": "✅ pass",
       "duration_ms": 100,
       "created_at": "2026-04-07T17:48:05.409Z"
+    },
+    {
+      "id": 40,
+      "task_id": "T03",
+      "slice_id": "S01",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/alvara-contribute.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 10200,
+      "created_at": "2026-04-07T17:54:00.960Z"
+    },
+    {
+      "id": 41,
+      "task_id": "T03",
+      "slice_id": "S01",
+      "milestone_id": "M002",
+      "command": "test -f scripts/contribute-bskt.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T17:54:00.960Z"
+    },
+    {
+      "id": 42,
+      "task_id": "T03",
+      "slice_id": "S01",
+      "milestone_id": "M002",
+      "command": "node -e investTxHash check",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T17:54:00.960Z"
+    },
+    {
+      "id": 43,
+      "task_id": "T03",
+      "slice_id": "S01",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/outbound-pipeline.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 5900,
+      "created_at": "2026-04-07T17:54:00.960Z"
     }
   ]
 }
