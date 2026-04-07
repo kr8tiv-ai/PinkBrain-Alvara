@@ -46,7 +46,7 @@
   - Estimate: 1h
   - Files: src/config/solana.ts, src/jupiter/types.ts, src/jupiter/swap.ts, tests/jupiter-swap.test.ts, scripts/jupiter-swap.ts, package.json
   - Verify: npx vitest run tests/jupiter-swap.test.ts && npx tsx scripts/jupiter-swap.ts --estimate-only --amount 10000000
-- [ ] **T02: Build holder resolution module with dual-strategy RPC, unit tests, and CLI script** — Create the holder resolution subsystem that proves R013 (query top 100 holders of any SPL token mint). Implements two strategies: `getProgramAccounts` with SPL Token filters (universal fallback) and Helius DAS `getTokenAccounts` (preferred when Helius RPC detected). Returns sorted holder list with owner addresses, amounts, and percentage shares.
+- [x] **T02: Built dual-strategy SPL token holder resolution module with 40 passing unit tests and CLI proof script** — Create the holder resolution subsystem that proves R013 (query top 100 holders of any SPL token mint). Implements two strategies: `getProgramAccounts` with SPL Token filters (universal fallback) and Helius DAS `getTokenAccounts` (preferred when Helius RPC detected). Returns sorted holder list with owner addresses, amounts, and percentage shares.
 
 ## Failure Modes
 

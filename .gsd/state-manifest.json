@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T08:43:43.662Z",
+  "exported_at": "2026-04-07T08:50:32.892Z",
   "milestones": [
     {
       "id": "M001",
@@ -648,19 +648,28 @@
       "milestone_id": "M001",
       "slice_id": "S04",
       "id": "T02",
-      "title": "Build holder resolution module with dual-strategy RPC, unit tests, and CLI script",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built dual-strategy SPL token holder resolution module with 40 passing unit tests and CLI proof script",
+      "status": "complete",
+      "one_liner": "Built dual-strategy SPL token holder resolution module with 40 passing unit tests and CLI proof script",
+      "narrative": "Created the holder resolution subsystem: types (HolderInfo, HolderResolutionResult), dual-strategy resolve module (getProgramAccounts universal fallback + Helius DAS preferred path with automatic fallback), 40 unit tests covering account parsing, descending sort, percentage calculation, zero-balance filtering, count limiting, input validation (empty/invalid mint, count bounds), Helius pagination with cursor, Helius→GPA fallback on error, and RPC error propagation. CLI proof script with --mint and --count flags outputs a human-readable table. All 143 tests pass across the full test suite with no regressions.",
+      "verification_result": "npx vitest run tests/holder-resolution.test.ts → 40/40 pass. npx vitest run → 143/143 pass (6 files). CLI --help exits 0. Live USDC query correctly returns descriptive RPC scan-limit error (expected for public mainnet with millions of token accounts).",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T08:50:32.835Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Live CLI test against USDC on public mainnet hits RPC scan limit (expected for millions of token accounts). Module correctly propagates the descriptive error. Resolution works for smaller tokens or with Helius/paid RPC.",
+      "known_issues": "Public Solana mainnet RPC rejects getProgramAccounts for high-holder-count tokens. Production use for popular tokens requires Helius DAS or paid RPC endpoint.",
+      "key_files": [
+        "src/holders/types.ts",
+        "src/holders/resolve.ts",
+        "tests/holder-resolution.test.ts",
+        "scripts/resolve-holders.ts",
+        "package.json"
+      ],
+      "key_decisions": [
+        "Used integer math (bigint * 10000n / total) for percentage calculation to avoid floating point drift",
+        "maxPages for Helius pagination derived from count*2 to allow filtering headroom while bounding RPC calls"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S04\nmilestone: M001\nkey_files:\n  - src/holders/types.ts\n  - src/holders/resolve.ts\n  - tests/holder-resolution.test.ts\n  - scripts/resolve-holders.ts\n  - package.json\nkey_decisions:\n  - Used integer math (bigint * 10000n / total) for percentage calculation to avoid floating point drift\n  - maxPages for Helius pagination derived from count*2 to allow filtering headroom while bounding RPC calls\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T08:50:32.834Z\nblocker_discovered: false\n---\n\n# T02: Built dual-strategy SPL token holder resolution module with 40 passing unit tests and CLI proof script\n\n**Built dual-strategy SPL token holder resolution module with 40 passing unit tests and CLI proof script**\n\n## What Happened\n\nCreated the holder resolution subsystem: types (HolderInfo, HolderResolutionResult), dual-strategy resolve module (getProgramAccounts universal fallback + Helius DAS preferred path with automatic fallback), 40 unit tests covering account parsing, descending sort, percentage calculation, zero-balance filtering, count limiting, input validation (empty/invalid mint, count bounds), Helius pagination with cursor, Helius→GPA fallback on error, and RPC error propagation. CLI proof script with --mint and --count flags outputs a human-readable table. All 143 tests pass across the full test suite with no regressions.\n\n## Verification\n\nnpx vitest run tests/holder-resolution.test.ts → 40/40 pass. npx vitest run → 143/143 pass (6 files). CLI --help exits 0. Live USDC query correctly returns descriptive RPC scan-limit error (expected for public mainnet with millions of token accounts).\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/holder-resolution.test.ts` | 0 | ✅ pass | 3840ms |\n| 2 | `npx vitest run` | 0 | ✅ pass | 7750ms |\n| 3 | `npx tsx scripts/resolve-holders.ts --help` | 0 | ✅ pass | 2000ms |\n\n## Deviations\n\nLive CLI test against USDC on public mainnet hits RPC scan limit (expected for millions of token accounts). Module correctly propagates the descriptive error. Resolution works for smaller tokens or with Helius/paid RPC.\n\n## Known Issues\n\nPublic Solana mainnet RPC rejects getProgramAccounts for high-holder-count tokens. Production use for popular tokens requires Helius DAS or paid RPC endpoint.\n\n## Files Created/Modified\n\n- `src/holders/types.ts`\n- `src/holders/resolve.ts`\n- `tests/holder-resolution.test.ts`\n- `scripts/resolve-holders.ts`\n- `package.json`\n",
       "description": "Create the holder resolution subsystem that proves R013 (query top 100 holders of any SPL token mint). Implements two strategies: `getProgramAccounts` with SPL Token filters (universal fallback) and Helius DAS `getTokenAccounts` (preferred when Helius RPC detected). Returns sorted holder list with owner addresses, amounts, and percentage shares.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Solana RPC `getProgramAccounts` | Throw with RPC error message and code | Connection timeout (60s default), throw descriptive error | Validate account data length is 165 bytes, skip malformed accounts with warning log |\n| Helius DAS `getTokenAccounts` | Fall back to `getProgramAccounts` strategy with warning log | Fall back to `getProgramAccounts` strategy | Validate response has `token_accounts` array, fall back on unexpected shape |\n\n## Negative Tests\n\n- **Malformed inputs**: empty mint address, invalid base58 mint, count of 0, count > 10000\n- **Error paths**: RPC connection refused, getProgramAccounts disabled (HTTP 403/410), Helius 429 rate limit, malformed account data (< 165 bytes)\n- **Boundary conditions**: token with 0 holders, token with < count holders, zero-balance accounts filtered, count=1\n\n## Steps\n\n1. Create `src/holders/types.ts` with:\n   - `HolderInfo` interface: `{ owner: string; amount: bigint; percentage: number }`\n   - `HolderResolutionResult` interface: `{ holders: HolderInfo[]; totalSupplyHeld: bigint; strategy: 'helius-das' | 'getProgramAccounts'; mint: string }`\n2. Create `src/holders/resolve.ts` with:\n   - `log()` structured logger (module: 'holders')\n   - `isHeliusRpc(url)` — detect Helius RPC from URL (contains 'helius')\n   - `resolveHoldersViaProgramAccounts(connection, mint, count)` — calls `connection.getProgramAccounts()` with SPL Token program ID, dataSize filter (165), memcmp filter at offset 0 for mint bytes. Parse each account: owner at bytes 32-63, amount at bytes 64-71 (u64 LE via `Buffer.readBigUInt64LE(64)`). Filter zero-balance. Sort descending. Take top `count`. Calculate percentage shares.\n   - `resolveHoldersViaHelius(rpcUrl, mint, count)` — calls Helius DAS `getTokenAccounts` with mint filter, paginated (limit 1000 per page). Parse owner + amount. Sort descending. Take top `count`. Calculate percentages.\n   - `getTopHolders(mint, count, connection?)` — main entry: if Helius detected, try Helius first with fallback to getProgramAccounts. Otherwise use getProgramAccounts directly. Input validation on mint (non-empty, 32-44 chars base58) and count (1-10000).\n   - **Critical**: SPL Token account layout is 165 bytes. Mint at offset 0 (32 bytes), owner at offset 32 (32 bytes), amount at offset 64 (8 bytes u64 LE). Filter out zero-balance accounts before sorting.\n3. Create `tests/holder-resolution.test.ts` with mocked RPC:\n   - Test `resolveHoldersViaProgramAccounts` parses account data correctly (craft Buffer with known mint/owner/amount)\n   - Test sorting is descending by amount\n   - Test percentage calculation sums to ~100% (within rounding)\n   - Test zero-balance accounts are filtered\n   - Test count limiting (request 5, get 5 even if more exist)\n   - Test input validation (empty mint, count=0)\n   - Test `isHeliusRpc` detection\n   - Test fallback from Helius to getProgramAccounts on error\n4. Create `scripts/resolve-holders.ts` CLI proof script:\n   - `--mint <address>` flag (required)\n   - `--count <N>` flag (default: 100)\n   - Uses `SOL_RPC_URL` env var (defaults to public mainnet)\n   - Outputs table: rank, owner address (truncated), amount, percentage\n   - Structured logging + human-readable summary\n5. Add `resolve-holders` script to `package.json`",
       "estimate": "1h",
       "files": [
@@ -1189,6 +1198,39 @@
       "verdict": "✅ pass",
       "duration_ms": 9300,
       "created_at": "2026-04-07T08:43:43.612Z"
+    },
+    {
+      "id": 19,
+      "task_id": "T02",
+      "slice_id": "S04",
+      "milestone_id": "M001",
+      "command": "npx vitest run tests/holder-resolution.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3840,
+      "created_at": "2026-04-07T08:50:32.835Z"
+    },
+    {
+      "id": 20,
+      "task_id": "T02",
+      "slice_id": "S04",
+      "milestone_id": "M001",
+      "command": "npx vitest run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 7750,
+      "created_at": "2026-04-07T08:50:32.835Z"
+    },
+    {
+      "id": 21,
+      "task_id": "T02",
+      "slice_id": "S04",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/resolve-holders.ts --help",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 2000,
+      "created_at": "2026-04-07T08:50:32.835Z"
     }
   ]
 }
