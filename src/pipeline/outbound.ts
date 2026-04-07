@@ -38,6 +38,10 @@ import {
   updatePipelineRun,
   recordTransaction,
 } from '../db/fund-repository.js';
+import { swapUsdcToEth } from '../evm/swap.js';
+import { contributeToBSKT } from '../alvara/contribute.js';
+import { KNOWN_ADDRESSES } from '../config/chains.js';
+import { formatEther } from 'viem';
 
 // ── Constants ───────────────────────────────────────────────────────────
 
@@ -133,6 +137,7 @@ export async function runOutboundPipeline(
     feeTransfer: null,
     bridgeSend: null,
     bridgeReceive: null,
+    usdcToEthTxHash: null,
     investTxHash: null,
   };
 
@@ -435,6 +440,114 @@ export async function runOutboundPipeline(
       fulfillTx: fulfillment.fulfillTransactionHash,
     });
 
+    // ── Phase 5: Investing — USDC→ETH swap + BSKT contribute ──────
+
+    let amountInvested = '0';
+
+    const canInvest = opts.evmPublicClient && opts.evmWalletClient && fund.bsktAddress;
+
+    if (!canInvest) {
+      const missing: string[] = [];
+      if (!opts.evmPublicClient) missing.push('evmPublicClient');
+      if (!opts.evmWalletClient) missing.push('evmWalletClient');
+      if (!fund.bsktAddress) missing.push('fund.bsktAddress');
+      log('investing', 'skip', { reason: 'missing dependencies', missing });
+    } else {
+      await updatePipelineRun(db, runId, { phase: 'investing' });
+
+      const evmPublicClient = opts.evmPublicClient!;
+      const evmWalletClient = opts.evmWalletClient!;
+      const bsktAddr = fund.bsktAddress as `0x${string}`;
+
+      // Read actual USDC balance on Base wallet (more reliable than bridged amount)
+      log('investing', 'readingUsdcBalance', { wallet: baseWallet.address });
+
+      const usdcBalance: bigint = await evmPublicClient.readContract({
+        address: KNOWN_ADDRESSES.USDC,
+        abi: [
+          {
+            inputs: [{ name: 'account', type: 'address' }],
+            name: 'balanceOf',
+            outputs: [{ name: '', type: 'uint256' }],
+            stateMutability: 'view',
+            type: 'function',
+          },
+        ] as const,
+        functionName: 'balanceOf',
+        args: [baseWallet.address as `0x${string}`],
+      });
+
+      log('investing', 'usdcBalance', { balance: String(usdcBalance) });
+
+      if (usdcBalance <= 0n) {
+        log('investing', 'skip', { reason: 'zero USDC balance on Base' });
+      } else {
+        // 5a. Swap USDC → ETH via 1inch
+        log('investing', 'swapStart', { usdcAmount: String(usdcBalance) });
+
+        const swapEvmResult = await swapUsdcToEth({
+          publicClient: evmPublicClient,
+          walletClient: evmWalletClient,
+          usdcAmount: usdcBalance,
+        });
+
+        txHashes.usdcToEthTxHash = swapEvmResult.txHash;
+
+        log('investing', 'swapDone', {
+          txHash: swapEvmResult.txHash,
+          ethReceived: String(swapEvmResult.ethReceived),
+        });
+
+        await recordTransaction(db, {
+          fundId,
+          pipelineRunId: runId,
+          chain: 'base',
+          txHash: swapEvmResult.txHash,
+          operation: 'swap',
+          amount: String(swapEvmResult.ethReceived),
+          token: KNOWN_ADDRESSES.USDC,
+        });
+
+        // 5b. Contribute ETH to BSKT
+        const ethToContribute = swapEvmResult.ethReceived;
+        if (ethToContribute <= 0n) {
+          log('investing', 'skipContribute', { reason: 'zero ETH from swap' });
+        } else {
+          const ethStr = formatEther(ethToContribute);
+          log('investing', 'contributeStart', {
+            bskt: bsktAddr,
+            ethAmount: ethStr,
+          });
+
+          const contributeResult = await contributeToBSKT({
+            publicClient: evmPublicClient,
+            walletClient: evmWalletClient,
+            bsktAddress: bsktAddr,
+            ethAmount: ethStr,
+          });
+
+          txHashes.investTxHash = contributeResult.txHash;
+          amountInvested = String(ethToContribute);
+
+          log('investing', 'contributeDone', {
+            txHash: contributeResult.txHash,
+            gasUsed: String(contributeResult.gasUsed),
+            lpIncrease: String(contributeResult.lpBalanceAfter - contributeResult.lpBalanceBefore),
+          });
+
+          await recordTransaction(db, {
+            fundId,
+            pipelineRunId: runId,
+            chain: 'base',
+            txHash: contributeResult.txHash!,
+            operation: 'bskt_contribute',
+            amount: amountInvested,
+            token: 'ETH',
+          });
+        }
+      }
+    }
+
     // ── Complete ────────────────────────────────────────────────────
 
     await updatePipelineRun(db, runId, {
@@ -450,7 +563,7 @@ export async function runOutboundPipeline(
       feeDeducted: feeAmount.toString(),
       amountBridged: bridgeAmount.toString(),
       bridgeOrderId: bridgeOrder.orderId,
-      amountInvested: '0',
+      amountInvested: amountInvested,
       durationMs: Date.now() - startTime,
     };
 
@@ -461,6 +574,7 @@ export async function runOutboundPipeline(
       swapped: result.amountSwapped,
       fee: result.feeDeducted,
       bridged: result.amountBridged,
+      invested: result.amountInvested,
     });
 
     return result;

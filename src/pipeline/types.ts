@@ -8,6 +8,13 @@
 import type { Connection, Keypair } from '@solana/web3.js';
 import type { BagsSDK } from '@bagsfm/bags-sdk';
 import type { AppDb } from '../db/connection.js';
+import type { Address } from 'viem';
+
+// Use loose typing to avoid viem chain-specific PublicClient/WalletClient generics mismatch
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPublicClient = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyWalletClient = any;
 
 // ── Pipeline options ────────────────────────────────────────────────────
 
@@ -25,6 +32,14 @@ export interface OutboundPipelineOptions {
   db: AppDb;
   /** Base58 address of the platform treasury wallet (receives protocol fees) */
   platformTreasuryWallet: string;
+
+  // ── EVM / investing phase (optional — backward compatible) ──────────
+  /** Viem PublicClient for Base reads (required for investing phase) */
+  evmPublicClient?: AnyPublicClient;
+  /** Viem WalletClient for Base signing (required for investing phase) */
+  evmWalletClient?: AnyWalletClient;
+  /** Target BSKT contract address on Base (required for investing phase) */
+  bsktAddress?: Address;
 }
 
 // ── Pipeline result ─────────────────────────────────────────────────────
@@ -36,6 +51,8 @@ export interface PipelineTxHashes {
   feeTransfer: string | null;
   bridgeSend: string | null;
   bridgeReceive: string | null;
+  /** USDC→ETH swap transaction hash on Base (null if not yet swapped) */
+  usdcToEthTxHash: string | null;
   /** BSKT contribute() transaction hash on Base (null if not yet invested) */
   investTxHash: string | null;
 }

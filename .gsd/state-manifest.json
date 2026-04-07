@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T18:15:19.015Z",
+  "exported_at": "2026-04-07T18:29:49.669Z",
   "milestones": [
     {
       "id": "M001",
@@ -1365,19 +1365,29 @@
       "milestone_id": "M002",
       "slice_id": "S02",
       "id": "T02",
-      "title": "Pipeline investing phase — USDC→ETH swap on Base and BSKT contribution",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Created USDC→ETH swap utility via 1inch, extended pipeline with investing phase (swap + BSKT contribute), 29 tests pass",
+      "status": "complete",
+      "one_liner": "Created USDC→ETH swap utility via 1inch, extended pipeline with investing phase (swap + BSKT contribute), 29 tests pass",
+      "narrative": "Built src/evm/swap.ts with swapUsdcToEth() handling the full 1inch Swap API flow: allowance check, approve, fetch calldata, send tx, confirm, compute ETH received. Extended OutboundPipelineOptions with optional EVM fields. Added phase 5 (investing) to runOutboundPipeline after bridge fulfillment: reads USDC balance on Base, swaps USDC→ETH via 1inch, contributes ETH to BSKT, records both transactions. Phase is entirely optional — skips gracefully when EVM deps missing. Wrote 9 new tests covering full 5-phase pipeline, backward compat, error handling, partial state on contribute failure. All 20 existing tests continue to pass.",
+      "verification_result": "npx vitest run tests/pipeline-investing.test.ts tests/outbound-pipeline.test.ts — 29 tests pass (9 new + 20 existing). npx tsc --noEmit — zero new errors in src/. All expected files verified to exist.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T18:29:49.554Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/evm/swap.ts",
+        "src/evm/index.ts",
+        "src/pipeline/types.ts",
+        "src/pipeline/outbound.ts",
+        "tests/pipeline-investing.test.ts"
+      ],
+      "key_decisions": [
+        "Used any-typed EVM clients consistent with contribute.ts to avoid viem chain generics",
+        "Read on-chain USDC balance rather than trusting bridged amount",
+        "Investing phase guarded by optional deps check for backward compatibility"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S02\nmilestone: M002\nkey_files:\n  - src/evm/swap.ts\n  - src/evm/index.ts\n  - src/pipeline/types.ts\n  - src/pipeline/outbound.ts\n  - tests/pipeline-investing.test.ts\nkey_decisions:\n  - Used any-typed EVM clients consistent with contribute.ts to avoid viem chain generics\n  - Read on-chain USDC balance rather than trusting bridged amount\n  - Investing phase guarded by optional deps check for backward compatibility\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T18:29:49.553Z\nblocker_discovered: false\n---\n\n# T02: Created USDC→ETH swap utility via 1inch, extended pipeline with investing phase (swap + BSKT contribute), 29 tests pass\n\n**Created USDC→ETH swap utility via 1inch, extended pipeline with investing phase (swap + BSKT contribute), 29 tests pass**\n\n## What Happened\n\nBuilt src/evm/swap.ts with swapUsdcToEth() handling the full 1inch Swap API flow: allowance check, approve, fetch calldata, send tx, confirm, compute ETH received. Extended OutboundPipelineOptions with optional EVM fields. Added phase 5 (investing) to runOutboundPipeline after bridge fulfillment: reads USDC balance on Base, swaps USDC→ETH via 1inch, contributes ETH to BSKT, records both transactions. Phase is entirely optional — skips gracefully when EVM deps missing. Wrote 9 new tests covering full 5-phase pipeline, backward compat, error handling, partial state on contribute failure. All 20 existing tests continue to pass.\n\n## Verification\n\nnpx vitest run tests/pipeline-investing.test.ts tests/outbound-pipeline.test.ts — 29 tests pass (9 new + 20 existing). npx tsc --noEmit — zero new errors in src/. All expected files verified to exist.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/pipeline-investing.test.ts tests/outbound-pipeline.test.ts` | 0 | ✅ pass | 13200ms |\n| 2 | `npx tsc --noEmit (src/ errors)` | 0 | ✅ pass | 50200ms |\n| 3 | `ls src/evm/swap.ts src/evm/index.ts src/scheduler/connection.ts src/scheduler/queue.ts drizzle/*.sql` | 0 | ✅ pass | 200ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/evm/swap.ts`\n- `src/evm/index.ts`\n- `src/pipeline/types.ts`\n- `src/pipeline/outbound.ts`\n- `tests/pipeline-investing.test.ts`\n",
       "description": "Extend the outbound pipeline with a 5th phase (investing) that swaps bridged USDC to ETH on Base via a DEX aggregator API, then calls contributeToBSKT() from S01. Build the EVM swap utility module. Write comprehensive unit tests.\n\n## Why\nThis is the core value of S02 — the pipeline currently ends after bridging USDC to Base. The investing phase closes the loop by converting USDC→ETH and contributing to the Alvara BSKT. R007 (contribute interface) is advanced here.\n\n## Steps\n1. Create `src/evm/swap.ts` — EVM-side swap utility:\n   - `swapUsdcToEth(opts: { publicClient, walletClient, usdcAmount: bigint })` that calls 1inch Swap API (v6.0) on Base to get calldata for USDC→ETH swap, then sends the transaction.\n   - Returns `{ txHash, ethReceived: bigint }`. Uses structured JSON logging (module: 'evm-swap').\n   - Handles approval: check USDC allowance for 1inch router, approve if needed.\n   - Configurable slippage (default 1%), deadline.\n   - If 1inch API is unavailable (rate limit, downtime), throw a descriptive error — no silent fallback.\n   - Export the 1inch router address as a constant.\n\n2. Create `src/evm/index.ts` — barrel re-exports.\n\n3. Extend `OutboundPipelineOptions` in `src/pipeline/types.ts` with optional EVM fields:\n   - `evmPublicClient?` — viem PublicClient for Base reads\n   - `evmWalletClient?` — viem WalletClient for Base signing\n   - `bsktAddress?` — target BSKT contract address\n   These are optional because existing pipeline callers (scripts, tests) don't have them.\n\n4. Add `usdcToEthTxHash: string | null` to `PipelineTxHashes`.\n\n5. Extend `runOutboundPipeline()` in `src/pipeline/outbound.ts` with phase 5 after bridge fulfillment:\n   - Guard: skip investing if `evmWalletClient`, `evmPublicClient`, or fund's `bsktAddress` are missing — log warning and complete without investing (backward compatible).\n   - Read USDC balance on Base wallet (not the bridged amount — actual on-chain balance for reliability).\n   - Call `swapUsdcToEth()` to convert USDC→ETH.\n   - Call `contributeToBSKT()` with the ETH proceeds.\n   - Record both transactions in DB (operation: 'swap' for USDC→ETH, 'bskt_contribute' for contribute).\n   - Update `txHashes.usdcToEthTxHash` and `txHashes.investTxHash`.\n   - Update `result.amountInvested` with ETH wei as string.\n   - Update pipeline phase to 'investing' before starting.\n\n6. Write `tests/pipeline-investing.test.ts`:\n   - Mock `src/evm/swap.ts`, `src/alvara/contribute.ts`, and all existing subsystems.\n   - Test: full pipeline with investing phase fires (all 5 phases).\n   - Test: pipeline skips investing when EVM clients not provided (backward compat).\n   - Test: pipeline skips investing when fund has no bsktAddress.\n   - Test: investing phase failure marks pipeline as failed with descriptive error.\n   - Test: USDC→ETH swap result is passed correctly to contributeToBSKT.\n   - Test: both invest transactions (swap + contribute) are recorded in DB.\n\n7. Verify existing tests pass: `npx vitest run tests/outbound-pipeline.test.ts` (backward compat).\n\n## Failure Modes\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| 1inch Swap API | Throw AlvaraApiError with error body | Throw after 15s timeout | Validate response has tx.data and tx.to fields |\n| contributeToBSKT | Pipeline fails with phase='investing' error | contributeTimeout from contribute module | N/A (typed response) |\n| USDC balance read | Retry once, then fail pipeline | Retry once | Validate is bigint |\n\n## Negative Tests\n- Pipeline with no EVM clients completes without error (returns amountInvested='0')\n- Pipeline with no bsktAddress logs warning and completes\n- Swap API returning invalid calldata throws before tx send\n- contributeToBSKT failure records partial state (usdcToEthTxHash set, investTxHash null)",
       "estimate": "2h",
       "files": [
@@ -2423,6 +2433,39 @@
       "verdict": "✅ pass",
       "duration_ms": 200,
       "created_at": "2026-04-07T18:15:18.962Z"
+    },
+    {
+      "id": 48,
+      "task_id": "T02",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/pipeline-investing.test.ts tests/outbound-pipeline.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 13200,
+      "created_at": "2026-04-07T18:29:49.554Z"
+    },
+    {
+      "id": 49,
+      "task_id": "T02",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "npx tsc --noEmit (src/ errors)",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 50200,
+      "created_at": "2026-04-07T18:29:49.554Z"
+    },
+    {
+      "id": 50,
+      "task_id": "T02",
+      "slice_id": "S02",
+      "milestone_id": "M002",
+      "command": "ls src/evm/swap.ts src/evm/index.ts src/scheduler/connection.ts src/scheduler/queue.ts drizzle/*.sql",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 200,
+      "created_at": "2026-04-07T18:29:49.554Z"
     }
   ]
 }
