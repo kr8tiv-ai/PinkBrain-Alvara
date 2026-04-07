@@ -2,11 +2,9 @@
 
 This file is the explicit capability and coverage contract for the project.
 
-Use it to track what is actively in scope, what has been validated by completed work, what is intentionally deferred, and what is explicitly out of scope.
-
 ## Active
 
-### R001 — Multi-tenant fund creation
+### R001 — Any Bags.fm token creator can create an isolated fund instance with its own treasury wallet, Alvara basket, and distribution config
 - Class: core-capability
 - Status: active
 - Description: Any Bags.fm token creator can create an isolated fund instance with its own treasury wallet, Alvara basket, and distribution config
@@ -17,7 +15,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Each fund gets isolated state in PostgreSQL, separate EVM wallet, separate Solana treasury
 
-### R002 — Bags.fm fee share redirection
+### R002 — Programmatically configure a token's fee share to direct reflections to the fund's treasury wallet using Bags SDK admin endpoints
 - Class: core-capability
 - Status: active
 - Description: Programmatically configure a token's fee share to direct reflections to the fund's treasury wallet using Bags SDK admin endpoints
@@ -28,7 +26,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Bags SDK POST /fee-share/config with basis points. Token creator must authorize initial redirect (one-time manual step).
 
-### R003 — Reflection accumulation & threshold trigger
+### R003 — Treasury wallet monitors accumulated reflections and triggers the outbound pipeline when balance exceeds a configurable threshold (default 5 SOL equivalent)
 - Class: primary-user-loop
 - Status: active
 - Description: Treasury wallet monitors accumulated reflections and triggers the outbound pipeline when balance exceeds a configurable threshold (default 5 SOL equivalent)
@@ -39,7 +37,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Scheduled job checks every 6 hours. Threshold configurable per fund at setup.
 
-### R004 — Jupiter DEX swap (SOL → USDC)
+### R004 — Swap accumulated SOL reflections to USDC on Solana via Jupiter Aggregator before bridging
 - Class: core-capability
 - Status: active
 - Description: Swap accumulated SOL reflections to USDC on Solana via Jupiter Aggregator before bridging
@@ -50,7 +48,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Jupiter SDK or REST API. Must handle slippage protection.
 
-### R005 — deBridge outbound bridge (Solana → EVM)
+### R005 — Bridge USDC from Solana to Base or Ethereum via deBridge DLN REST API with 1-2 second fulfillment
 - Class: core-capability
 - Status: active
 - Description: Bridge USDC from Solana to Base or Ethereum via deBridge DLN REST API with 1-2 second fulfillment
@@ -61,18 +59,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Solana chain ID 7565164, Base chain ID 8453, Ethereum chain ID 1. deBridge has zero TVL risk (intent-based). Transfer caps mandatory.
 
-### R006 — Alvara factory contract discovery (on-chain)
-- Class: core-capability
-- Status: active
-- Description: Reverse-engineer Alvara's BSKT factory contract addresses from on-chain transaction data on Base and Ethereum
-- Why it matters: No published factory addresses or SDK — this is the only path to programmatic BSKT creation without team coordination
-- Source: user
-- Primary owning slice: M001/S01
-- Supporting slices: none
-- Validation: unmapped
-- Notes: ALVA token on Base: 0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb. Inspect creation txs at bskt.alvara.xyz. Alvara's MEV-protected backend signs swap routes — need to determine if direct contract interaction bypasses this.
-
-### R007 — Alvara BSKT creation via factory contract
+### R007 — Programmatically create an ERC-7621 basket on Alvara's platform by calling the factory contract directly, seeded with minimum 0.1 ETH
 - Class: core-capability
 - Status: active
 - Description: Programmatically create an ERC-7621 basket on Alvara's platform by calling the factory contract directly, seeded with minimum 0.1 ETH
@@ -80,10 +67,10 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Source: user
 - Primary owning slice: M001/S01
 - Supporting slices: M002/S02
-- Validation: unmapped
-- Notes: Single transaction: ETH → split by weights → swap to constituent tokens → mint LP + management NFT
+- Validation: S01/T02: Factory interface proven (createBSKT signature, full ABI). MEV analysis of 5 on-chain txs confirms backend-signed swap routes required — direct creation without Alvara's signing API will revert with InvalidSignature. Integration path documented in mev-findings.json. Capability achievable but requires Alvara backend API integration, not just direct contract calls.
+- Notes: Each fund gets isolated state in PostgreSQL, separate EVM wallet, separate Solana treasury. BSKT creation requires Alvara backend-signed swap routes — direct contract calls revert without valid _signature and _swapData. Integration with Alvara API or UI automation needed for M002/S02.
 
-### R008 — Basket rebalancing (composition changes)
+### R008 — Token owner can change basket composition via Alvara's two-phase rebalance (sell to WETH → buy new allocation)
 - Class: core-capability
 - Status: active
 - Description: Token owner can change basket composition via Alvara's two-phase rebalance (sell to WETH → buy new allocation)
@@ -94,7 +81,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Two separate on-chain transactions. MEV-protected via Alvara's backend signing. Owner can only change composition, not divestment config.
 
-### R009 — On-chain transparent divestment config
+### R009 — The divestment split (% to holders vs % to owner) and trigger conditions are stored on-chain so anyone can verify
 - Class: core-capability
 - Status: active
 - Description: The divestment split (% to holders vs % to owner) and trigger conditions are stored on-chain so anyone can verify
@@ -105,7 +92,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Custom config registry contract on EVM side. Stores: recipient split (basis points), trigger type (time/threshold/both), trigger params, distribution currency choice.
 
-### R010 — Auto-divestment triggers (time + value threshold)
+### R010 — Fund auto-liquidates based on configured triggers: time-based schedule, value threshold, or both. Locked at setup.
 - Class: primary-user-loop
 - Status: active
 - Description: Fund auto-liquidates based on configured triggers: time-based schedule, value threshold, or both. Locked at setup.
@@ -116,7 +103,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Time-based: monthly, quarterly, etc. Value-based: total basket TVL hits target. Both: whichever triggers first.
 
-### R011 — Alvara "Redeem for ETH" liquidation
+### R011 — Liquidate basket position by redeeming all LP tokens for ETH via Alvara's existing redemption mechanism
 - Class: core-capability
 - Status: active
 - Description: Liquidate basket position by redeeming all LP tokens for ETH via Alvara's existing redemption mechanism
@@ -127,7 +114,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: LP tokens burned → underlying tokens sold to ETH → ETH returned to wallet. MEV-protected.
 
-### R012 — deBridge return bridge (EVM → Solana)
+### R012 — Bridge liquidation proceeds (USDC/ETH) from Base/Ethereum back to Solana via deBridge DLN
 - Class: core-capability
 - Status: active
 - Description: Bridge liquidation proceeds (USDC/ETH) from Base/Ethereum back to Solana via deBridge DLN
@@ -138,7 +125,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: ETH → USDC swap on EVM side first (via 1inch or Alvara's swap), then bridge USDC to Solana.
 
-### R013 — Top 100 holder resolution (Solana RPC)
+### R013 — Query current top 100 holders of any SPL token mint via Solana RPC (getProgramAccounts with filters, or Helius DAS API)
 - Class: core-capability
 - Status: active
 - Description: Query current top 100 holders of any SPL token mint via Solana RPC (getProgramAccounts with filters, or Helius DAS API)
@@ -149,7 +136,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: getTokenLargestAccounts returns only 20. Need getProgramAccounts with data size filter for full list. Helius may offer a cleaner API.
 
-### R014 — Batched distribution to holders
+### R014 — Distribute divestment proceeds to up to 100 wallets on Solana via batched SPL token transfers with checkpoint recovery
 - Class: core-capability
 - Status: active
 - Description: Distribute divestment proceeds to up to 100 wallets on Solana via batched SPL token transfers with checkpoint recovery
@@ -160,7 +147,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: ~30 instructions per Solana versioned transaction → 4 transactions minimum for 100 holders. Checkpoint tracking for partial failure recovery.
 
-### R015 — Distribution currency choice (USDC or SOL)
+### R015 — Fund creator chooses at setup whether holders receive USDC or SOL. Choice locked at creation.
 - Class: core-capability
 - Status: active
 - Description: Fund creator chooses at setup whether holders receive USDC or SOL. Choice locked at creation.
@@ -171,7 +158,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: If SOL chosen, add a Jupiter USDC→SOL swap before distribution.
 
-### R016 — Protocol fee on reflections
+### R016 — The app takes a configurable percentage of each fund's reflections before they enter the outbound pipeline
 - Class: core-capability
 - Status: active
 - Description: The app takes a configurable percentage of each fund's reflections before they enter the outbound pipeline
@@ -182,7 +169,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Deducted on Solana side before bridge. Percentage configurable at platform level.
 
-### R017 — Divestment config immutable after creation
+### R017 — Once a fund's divestment config is set (split %, triggers, distribution currency), it cannot be changed
 - Class: constraint
 - Status: active
 - Description: Once a fund's divestment config is set (split %, triggers, distribution currency), it cannot be changed
@@ -193,7 +180,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Enforced by on-chain contract. No admin override.
 
-### R018 — On-chain verifiability of all fund operations
+### R018 — Every operation (fee claim, swap, bridge, basket creation, rebalance, redemption, distribution) must produce verifiable on-chain transaction hashes
 - Class: quality-attribute
 - Status: active
 - Description: Every operation (fee claim, swap, bridge, basket creation, rebalance, redemption, distribution) must produce verifiable on-chain transaction hashes
@@ -204,7 +191,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: All tx hashes persisted in PostgreSQL and displayed in dashboard. Anyone can verify on explorers.
 
-### R019 — Full automation — zero manual steps after setup
+### R019 — After initial fund creation (which requires one manual tx from token creator), the entire pipeline runs without human intervention
 - Class: quality-attribute
 - Status: active
 - Description: After initial fund creation (which requires one manual tx from token creator), the entire pipeline runs without human intervention
@@ -215,7 +202,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: One manual step: token creator authorizes fee share redirect at setup. Everything after is automated.
 
-### R020 — Fund Engine state machine (multi-fund orchestration)
+### R020 — Central orchestrator manages N concurrent fund lifecycles, each with independent state, scheduling, and failure recovery
 - Class: core-capability
 - Status: active
 - Description: Central orchestrator manages N concurrent fund lifecycles, each with independent state, scheduling, and failure recovery
@@ -226,7 +213,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: BullMQ for job scheduling. Each fund has its own state machine instance. Failures in one fund don't affect others.
 
-### R021 — Dual-chain support (Base + Ethereum mainnet)
+### R021 — Fund creator chooses at setup whether their Alvara basket is deployed on Base or Ethereum mainnet
 - Class: core-capability
 - Status: active
 - Description: Fund creator chooses at setup whether their Alvara basket is deployed on Base or Ethereum mainnet
@@ -237,7 +224,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Alvara launched on Base April 2, 2026. Both chains fully supported. deBridge supports both.
 
-### R022 — Bags.fm embedded app UI
+### R022 — The app's frontend is embedded within the Bags.fm app store, not a standalone site
 - Class: launchability
 - Status: active
 - Description: The app's frontend is embedded within the Bags.fm app store, not a standalone site
@@ -248,7 +235,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Need to investigate Bags.fm app store embed format during M004. May be iframe or custom integration.
 
-### R023 — Dashboard + email failure notifications
+### R023 — Fund owner sees pipeline failures in the dashboard and receives email alerts for stuck/failed operations
 - Class: failure-visibility
 - Status: active
 - Description: Fund owner sees pipeline failures in the dashboard and receives email alerts for stuck/failed operations
@@ -259,7 +246,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Dashboard shows failure state with tx hashes. Email via SendGrid or similar.
 
-### R024 — Emergency Stables circuit breaker
+### R024 — Ability to trigger Alvara's Emergency Stables function (convert basket to ~95% USDT + 5% ALVA) as an automated or manual circuit breaker
 - Class: continuity
 - Status: active
 - Description: Ability to trigger Alvara's Emergency Stables function (convert basket to ~95% USDT + 5% ALVA) as an automated or manual circuit breaker
@@ -270,7 +257,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Alvara built-in feature. Suspends normal operations. Manager can revert when stable.
 
-### R025 — Bridge failure recovery (retry + monitoring)
+### R025 — Bridge operations implement automatic retry with exponential backoff, status monitoring, and manual intervention alerts
 - Class: continuity
 - Status: active
 - Description: Bridge operations implement automatic retry with exponential backoff, status monitoring, and manual intervention alerts
@@ -281,7 +268,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: deBridge orders have deterministic IDs for status queries. 5 retries over 30 minutes. Alert on exhaustion.
 
-### R026 — Multiple funds running in parallel
+### R026 — System must support 3-5+ active funds running simultaneously to prove multi-tenant architecture
 - Class: quality-attribute
 - Status: active
 - Description: System must support 3-5+ active funds running simultaneously to prove multi-tenant architecture
@@ -292,7 +279,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Each fund has isolated wallets, state, and job queues. Concurrent bridge operations.
 
-### R027 — Complete audit trail (all tx hashes recorded)
+### R027 — Every on-chain transaction across both chains is recorded with hash, timestamp, amount, status, and linked fund/operation
 - Class: quality-attribute
 - Status: active
 - Description: Every on-chain transaction across both chains is recorded with hash, timestamp, amount, status, and linked fund/operation
@@ -303,9 +290,22 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: PostgreSQL audit table. Exposed in dashboard and potentially via public API.
 
+## Validated
+
+### R006 — Reverse-engineer Alvara's BSKT factory contract addresses from on-chain transaction data on Base and Ethereum
+- Class: core-capability
+- Status: validated
+- Description: Reverse-engineer Alvara's BSKT factory contract addresses from on-chain transaction data on Base and Ethereum
+- Why it matters: No published factory addresses or SDK — this is the only path to programmatic BSKT creation without team coordination
+- Source: user
+- Primary owning slice: M001/S01
+- Supporting slices: none
+- Validation: S01/T01: Factory discovered at 0x9ee08080 on Base via deployer interaction scanning. Full ABI (93 entries), proxy detection, and machine-readable config in discovered-contracts.json.
+- Notes: ALVA token on Base: 0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb. Inspect creation txs at bskt.alvara.xyz. Alvara's MEV-protected backend signs swap routes — need to determine if direct contract interaction bypasses this.
+
 ## Deferred
 
-### R028 — Wormhole fallback bridge
+### R028 — Fallback to Wormhole SDK if deBridge is unavailable or fails repeatedly
 - Class: continuity
 - Status: deferred
 - Description: Fallback to Wormhole SDK if deBridge is unavailable or fails repeatedly
@@ -316,7 +316,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Deferred because deBridge has zero exploit history and adding a second bridge doubles the integration surface. Revisit if deBridge proves unreliable.
 
-### R029 — Auto-rebalance scheduling
+### R029 — Automatic periodic rebalancing on a schedule (weekly, monthly) with predefined strategies
 - Class: differentiator
 - Status: deferred
 - Description: Automatic periodic rebalancing on a schedule (weekly, monthly) with predefined strategies
@@ -327,7 +327,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: unmapped
 - Notes: Deferred because manual rebalance is sufficient for launch. Add when user demand is proven.
 
-### R030 — Basket templates (Blue Chip, AI, etc.)
+### R030 — Preset basket compositions that fund creators can choose from during setup
 - Class: differentiator
 - Status: deferred
 - Description: Preset basket compositions that fund creators can choose from during setup
@@ -340,7 +340,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 
 ## Out of Scope
 
-### R031 — Separate staking contract
+### R031 — A dedicated staking contract where users lock tokens to qualify for distributions
 - Class: anti-feature
 - Status: out-of-scope
 - Description: A dedicated staking contract where users lock tokens to qualify for distributions
@@ -351,7 +351,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 - Validation: n/a
 - Notes: User explicitly chose top 100 holders model.
 
-### R032 — Divestment config changes after setup
+### R032 — Allowing the fund creator to change divestment split, triggers, or distribution currency after fund creation
 - Class: anti-feature
 - Status: out-of-scope
 - Description: Allowing the fund creator to change divestment split, triggers, or distribution currency after fund creation
@@ -371,8 +371,8 @@ Use it to track what is actively in scope, what has been validated by completed 
 | R003 | primary-user-loop | active | M002/S01 | M001/S03 | unmapped |
 | R004 | core-capability | active | M001/S04 | M002/S01 | unmapped |
 | R005 | core-capability | active | M001/S02 | M002/S01 | unmapped |
-| R006 | core-capability | active | M001/S01 | none | unmapped |
-| R007 | core-capability | active | M001/S01 | M002/S02 | unmapped |
+| R006 | core-capability | validated | M001/S01 | none | S01/T01: Factory discovered at 0x9ee08080 on Base via deployer interaction scanning. Full ABI (93 entries), proxy detection, and machine-readable config in discovered-contracts.json. |
+| R007 | core-capability | active | M001/S01 | M002/S02 | S01/T02: Factory interface proven (createBSKT signature, full ABI). MEV analysis of 5 on-chain txs confirms backend-signed swap routes required — direct creation without Alvara's signing API will revert with InvalidSignature. Integration path documented in mev-findings.json. Capability achievable but requires Alvara backend API integration, not just direct contract calls. |
 | R008 | core-capability | active | M002/S03 | none | unmapped |
 | R009 | core-capability | active | M001/S05 | M003/S01 | unmapped |
 | R010 | primary-user-loop | active | M003/S01 | M001/S05 | unmapped |
@@ -401,7 +401,7 @@ Use it to track what is actively in scope, what has been validated by completed 
 
 ## Coverage Summary
 
-- Active requirements: 27
-- Mapped to slices: 27
-- Validated: 0
+- Active requirements: 26
+- Mapped to slices: 26
+- Validated: 1 (R006)
 - Unmapped active requirements: 0

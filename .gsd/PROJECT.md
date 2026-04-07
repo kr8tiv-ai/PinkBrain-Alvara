@@ -8,37 +8,51 @@ The app takes a protocol fee on reflections as its revenue model. Each token cre
 
 ## Core Value
 
-<!-- This is the primary value anchor for prioritization and tradeoffs.
-     If scope must shrink, this should survive. -->
-
 Any Bags.fm token creator can set up a fully automated investment fund that transparently pipes reflections into an EVM basket and auto-divests back to holders — zero manual intervention after setup, fully on-chain verifiable.
 
 ## Current State
 
-Empty repository. No code exists yet.
+**M001/S01 complete.** TypeScript project scaffolded with Alvara factory discovery pipeline and BSKT verification suite. Key findings:
+
+- Alvara BSKTs are ERC-721 NFTs (not standard ERC-7621) with custom view functions
+- BSKT creation requires backend-signed MEV-protected swap routes via 1inch
+- Every BSKT must include ≥5% ALVA token allocation (factory-enforced)
+- Factory address (`0x9ee08080`) discovered on Base with full 93-entry verified ABI
+
+Artifacts delivered: discovered-contracts.json (factory config), mev-findings.json (MEV analysis), factory interaction module, 10-check BSKT verification suite, standalone MEV analysis script.
+
+Remaining M001 slices (S02–S06) are not yet started. S02–S04 are independent subsystem proofs (deBridge, Bags SDK, Jupiter). S05–S06 depend on all prior slices.
 
 ## Architecture / Key Patterns
 
 **Three-layer architecture:**
 - **Solana Operations Layer** — Bags SDK fee share, Jupiter swaps, SPL token distribution, Helius RPC holder resolution
 - **Bridge Orchestration Layer (Fund Engine)** — Node.js service coordinating cross-chain state, PostgreSQL + BullMQ, multi-fund state machines
-- **EVM Operations Layer** — Alvara factory interaction on Base + Ethereum, ethers.js v6, ERC-7621 basket management
+- **EVM Operations Layer** — Alvara factory interaction on Base + Ethereum, viem, ERC-721 basket management
 
 **Key tech stack:**
 - TypeScript (Node.js 18+) for all backend services
 - React + Next.js for Bags.fm embedded app UI
 - @bagsfm/bags-sdk, @solana/web3.js, Jupiter SDK for Solana
 - deBridge DLN REST API for cross-chain bridging
-- ethers.js v6 for EVM interaction
+- viem for EVM interaction (established in S01)
 - PostgreSQL 16 + Redis/BullMQ for state and job queues
 - Foundry for Solidity contracts
 
 **Key constraints:**
-- Must use Alvara's actual platform contracts (reverse-engineered from on-chain data)
+- Alvara BSKTs are ERC-721 NFTs with custom interface (not standard ERC-7621)
+- BSKT creation requires Alvara backend-signed swap routes (MEV protection)
+- Every BSKT must include ≥5% ALVA token allocation
 - Divestment config immutable after fund creation, stored on-chain
 - Distribution to top 100 holders by token balance (not a separate staking contract)
 - Bags SDK rate limit: 1,000 req/hour per API key
-- Minimum Alvara BSKT seed: 0.1 ETH
+
+**Established patterns (S01):**
+- Blockscout free API for Base chain (Etherscan V2 as optional fallback with paid key)
+- EIP-1967 proxy detection for Alvara contract resolution
+- Structured JSON logging per script phase
+- 250ms delays between sequential RPC reads for public endpoint rate limits
+- BSKT ABI discovery chain: factory → bsktImplementation (beacon) → implementation → logic ABI
 
 ## Capability Contract
 
@@ -46,7 +60,7 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 
 ## Milestone Sequence
 
-- [ ] M001: Risk Retirement & Subsystem Proof — Prove every critical subsystem works: Alvara factory, deBridge, Bags SDK, Jupiter, holder resolution
-- [ ] M002: Outbound Pipeline (Solana → Alvara) — Reflections flow automatically from Bags.fm into Alvara baskets on Base + Ethereum
+- [ ] M001: Risk Retirement & Subsystem Proof — S01 ✅, S02–S06 remaining
+- [ ] M002: Outbound Pipeline (Solana → Alvara) — Reflections flow automatically from Bags.fm into Alvara baskets
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation
