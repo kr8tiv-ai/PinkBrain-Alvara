@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T17:42:51.381Z",
+  "exported_at": "2026-04-07T17:48:05.486Z",
   "milestones": [
     {
       "id": "M001",
@@ -1204,19 +1204,27 @@
       "milestone_id": "M002",
       "slice_id": "S01",
       "id": "T02",
-      "title": "Build typed Alvara backend API client",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built typed Alvara backend API client with getContributeRoutes, getCreateBSKTRoutes, getRebalanceRoutes, getWithdrawETHRoutes — all with input validation, runtime response validation, and structured error handling",
+      "status": "complete",
+      "one_liner": "Built typed Alvara backend API client with getContributeRoutes, getCreateBSKTRoutes, getRebalanceRoutes, getWithdrawETHRoutes — all with input validation, runtime response validation, and structured error handling",
+      "narrative": "Created src/alvara/types.ts with full request/response type definitions for all 4 Alvara backend endpoints, SignedSwapData base interface, typed AlvaraApiError with 6 error code variants, and runtime validation helpers. Built src/alvara/api.ts following the debridge thin REST client pattern with fetchWithTimeout, structured JSON logging, input validation, runtime response validation, and configurable base URL. Wrote 37 tests covering all endpoints' happy paths, HTTP errors, malformed responses, timeout, input validation, and response shape validation. S03 can import getRebalanceRoutes directly.",
+      "verification_result": "Ran npx vitest run tests/alvara-api.test.ts — all 37 tests pass. Verified all expected output files exist on disk.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T17:48:05.408Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Added getWithdrawETHRoutes and getCreateBSKTRoutes as separate named functions instead of a generic getSwapRoutes — each endpoint has distinct request parameters benefiting from separate typed functions.",
+      "known_issues": "Alvara backend API base URL not yet confirmed — inferred as https://api.alvara.xyz, configurable via env var once discovered.",
+      "key_files": [
+        "src/alvara/api.ts",
+        "src/alvara/types.ts",
+        "tests/alvara-api.test.ts"
+      ],
+      "key_decisions": [
+        "Configurable base URL via setApiBaseUrl()/ALVARA_API_URL since actual URL is in Cloudflare-protected frontend",
+        "Runtime validation of all SignedSwapData responses — not just type assertions",
+        "AlvaraApiError with typed error code enum for programmatic error handling"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S01\nmilestone: M002\nkey_files:\n  - src/alvara/api.ts\n  - src/alvara/types.ts\n  - tests/alvara-api.test.ts\nkey_decisions:\n  - Configurable base URL via setApiBaseUrl()/ALVARA_API_URL since actual URL is in Cloudflare-protected frontend\n  - Runtime validation of all SignedSwapData responses — not just type assertions\n  - AlvaraApiError with typed error code enum for programmatic error handling\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T17:48:05.407Z\nblocker_discovered: false\n---\n\n# T02: Built typed Alvara backend API client with getContributeRoutes, getCreateBSKTRoutes, getRebalanceRoutes, getWithdrawETHRoutes — all with input validation, runtime response validation, and structured error handling\n\n**Built typed Alvara backend API client with getContributeRoutes, getCreateBSKTRoutes, getRebalanceRoutes, getWithdrawETHRoutes — all with input validation, runtime response validation, and structured error handling**\n\n## What Happened\n\nCreated src/alvara/types.ts with full request/response type definitions for all 4 Alvara backend endpoints, SignedSwapData base interface, typed AlvaraApiError with 6 error code variants, and runtime validation helpers. Built src/alvara/api.ts following the debridge thin REST client pattern with fetchWithTimeout, structured JSON logging, input validation, runtime response validation, and configurable base URL. Wrote 37 tests covering all endpoints' happy paths, HTTP errors, malformed responses, timeout, input validation, and response shape validation. S03 can import getRebalanceRoutes directly.\n\n## Verification\n\nRan npx vitest run tests/alvara-api.test.ts — all 37 tests pass. Verified all expected output files exist on disk.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/alvara-api.test.ts` | 0 | ✅ pass | 17800ms |\n| 2 | `test -f src/alvara/api.ts && test -f src/alvara/types.ts && test -f tests/alvara-api.test.ts` | 0 | ✅ pass | 100ms |\n\n## Deviations\n\nAdded getWithdrawETHRoutes and getCreateBSKTRoutes as separate named functions instead of a generic getSwapRoutes — each endpoint has distinct request parameters benefiting from separate typed functions.\n\n## Known Issues\n\nAlvara backend API base URL not yet confirmed — inferred as https://api.alvara.xyz, configurable via env var once discovered.\n\n## Files Created/Modified\n\n- `src/alvara/api.ts`\n- `src/alvara/types.ts`\n- `tests/alvara-api.test.ts`\n",
       "description": "Using the API structure discovered in T01, build a production-quality HTTP client for the Alvara backend API.\n\n**Why:** Every BSKT operation (create, contribute, rebalance) requires backend-signed swap routes. This client is the single interface for all Alvara backend communication, reused by S03 for rebalancing.\n\n**Steps:**\n1. Read `src/alvara/api-discovery.md` from T01 to understand the exact endpoint structure.\n2. Create `src/alvara/api.ts` with typed functions:\n   - `getSwapRoutes(params)` — obtain signed swap data for createBSKT or contribute\n   - `getContributeRoutes(bsktAddress, ethAmount)` — obtain signed routes specifically for contributing ETH to an existing BSKT\n   - `getRebalanceRoutes(bsktAddress, newWeights)` — obtain signed routes for rebalancing (used by S03)\n   - Error handling: typed error classes for API failures, timeout, invalid response\n3. Create `src/alvara/types.ts` with all API request/response types.\n4. Write `tests/alvara-api.test.ts` with mocked HTTP responses covering:\n   - Successful route retrieval for create and contribute\n   - API error handling (4xx, 5xx, timeout, malformed response)\n   - Request parameter validation\n   - Response shape validation\n5. Follow the established thin REST client pattern from `src/debridge/api.ts`.\n\n**Constraints:**\n- Use native `fetch` (no axios) — consistent with existing codebase.\n- All API response types must be runtime-validated (not just type assertions).\n- Log requests with module/phase/action structured JSON (existing pattern).\n- Never log request bodies that might contain sensitive data.",
       "estimate": "1.5h",
       "files": [
@@ -2091,6 +2099,28 @@
       "verdict": "✅ pass",
       "duration_ms": 40100,
       "created_at": "2026-04-07T17:42:51.326Z"
+    },
+    {
+      "id": 38,
+      "task_id": "T02",
+      "slice_id": "S01",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/alvara-api.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 17800,
+      "created_at": "2026-04-07T17:48:05.408Z"
+    },
+    {
+      "id": 39,
+      "task_id": "T02",
+      "slice_id": "S01",
+      "milestone_id": "M002",
+      "command": "test -f src/alvara/api.ts && test -f src/alvara/types.ts && test -f tests/alvara-api.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T17:48:05.409Z"
     }
   ]
 }
