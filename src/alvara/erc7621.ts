@@ -1,23 +1,28 @@
 /**
- * ERC-7621 (Multi-Token Basket) read-only interface module.
+ * Alvara BSKT read-only interface module.
  *
- * Provides typed view functions for reading BSKT state: constituents, weights,
- * reserves, supply, and ownership. Based on the ERC-7621 specification.
+ * Based on the actual on-chain BSKT implementation (beacon proxy at 0x6ad920eB...).
+ * Alvara BSKTs are ERC-721 NFTs with custom basket management functions, not
+ * standard ERC-7621 (supportsInterface(0xc9c80f73) returns false on-chain).
  *
- * Also includes ERC-165 supportsInterface check and ERC-173 owner() for compliance.
+ * Key functions: getTokenDetails, totalTokens, getOwner, factory, description.
+ * Also includes ERC-165 supportsInterface for interface checks.
  */
 
 import {
   type Address,
-  type PublicClient,
   getContract,
   getAddress,
   isAddress,
 } from 'viem';
 
-// ── ERC-7621 ABI (view functions from the EIP spec) ───────────────────────
+// Use loose typing to avoid viem chain-specific PublicClient generics mismatch
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPublicClient = any;
 
-export const ERC7621_ABI = [
+// ── Alvara BSKT ABI (actual on-chain functions) ──────────────────────────
+
+export const ALVARA_BSKT_ABI = [
   // ERC-165
   {
     inputs: [{ name: 'interfaceId', type: 'bytes4' }],
@@ -26,10 +31,10 @@ export const ERC7621_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
-  // ERC-7621 core
+  // Alvara basket functions
   {
     inputs: [],
-    name: 'getConstituents',
+    name: 'getTokenDetails',
     outputs: [
       { name: 'tokens', type: 'address[]' },
       { name: 'weights', type: 'uint256[]' },
@@ -38,42 +43,44 @@ export const ERC7621_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'token', type: 'address' }],
-    name: 'getWeight',
-    outputs: [{ name: '', type: 'uint256' }],
+    inputs: [{ name: 'index', type: 'uint256' }],
+    name: 'getTokenDetails',
+    outputs: [
+      { name: 'token', type: 'address' },
+      { name: 'weight', type: 'uint256' },
+    ],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ name: 'token', type: 'address' }],
-    name: 'getReserve',
+    inputs: [],
+    name: 'totalTokens',
     outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
     inputs: [],
-    name: 'totalSupply',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'totalBasketValue',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  // ERC-173 ownership
-  {
-    inputs: [],
-    name: 'owner',
+    name: 'getOwner',
     outputs: [{ name: '', type: 'address' }],
     stateMutability: 'view',
     type: 'function',
   },
-  // ERC-20 basics (BSKTs are also ERC-20 LP tokens)
+  {
+    inputs: [],
+    name: 'factory',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'description',
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  // ERC-721 metadata
   {
     inputs: [],
     name: 'name',
@@ -90,18 +97,37 @@ export const ERC7621_ABI = [
   },
   {
     inputs: [],
-    name: 'decimals',
-    outputs: [{ name: '', type: 'uint8' }],
+    name: 'id',
+    outputs: [{ name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  // BSKTPair
+  {
+    inputs: [],
+    name: 'bsktPair',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  // ERC-721 balance
+  {
+    inputs: [{ name: 'owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
   },
 ] as const;
 
-/** ERC-7621 interface ID for supportsInterface check */
+/** ERC-7621 interface ID — Alvara BSKTs return false for this */
 export const ERC7621_INTERFACE_ID = '0xc9c80f73' as const;
 
 /** ERC-165 interface ID */
 export const ERC165_INTERFACE_ID = '0x01ffc9a7' as const;
+
+/** ERC-721 interface ID */
+export const ERC721_INTERFACE_ID = '0x80ac58cd' as const;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -113,13 +139,16 @@ export interface ConstituentInfo {
 export interface BSKTVerificationReport {
   verified: boolean;
   bsktAddress: Address;
-  interfaceSupported: boolean;
+  erc721Supported: boolean;
+  erc7621Supported: boolean;
   name: string;
   symbol: string;
+  description: string;
   constituents: { token: Address; weight: string }[];
   totalWeightBps: string;
-  totalSupply: string;
+  totalTokens: string;
   owner: Address;
+  factory: Address;
   checks: { name: string; passed: boolean; value: string }[];
 }
 
@@ -144,12 +173,12 @@ function validateAddress(addr: string, label: string): Address {
  * Check if a contract supports a given interface (ERC-165).
  */
 export async function supportsInterface(
-  client: PublicClient,
+  client: AnyPublicClient,
   address: Address,
   interfaceId: `0x${string}`,
 ): Promise<boolean> {
   try {
-    const contract = getContract({ address, abi: ERC7621_ABI, client });
+    const contract: any = getContract({ address, abi: ALVARA_BSKT_ABI, client });
     return await contract.read.supportsInterface([interfaceId]) as boolean;
   } catch {
     return false;
@@ -158,117 +187,100 @@ export async function supportsInterface(
 
 /**
  * Get the constituent tokens and their weights from a BSKT.
+ * Uses Alvara's getTokenDetails() (no-arg overload).
  */
 export async function getConstituents(
-  client: PublicClient,
+  client: AnyPublicClient,
   address: Address,
 ): Promise<ConstituentInfo> {
-  const contract = getContract({ address, abi: ERC7621_ABI, client });
-  const result = await contract.read.getConstituents() as [Address[], bigint[]];
+  const contract: any = getContract({ address, abi: ALVARA_BSKT_ABI, client });
+  const result = await contract.read.getTokenDetails() as [Address[], bigint[]];
   return { tokens: result[0], weights: result[1] };
 }
 
 /**
- * Get the weight of a specific token in the BSKT.
+ * Get the number of constituent tokens in the BSKT.
  */
-export async function getWeight(
-  client: PublicClient,
+export async function totalTokens(
+  client: AnyPublicClient,
   address: Address,
-  token: Address,
 ): Promise<bigint> {
-  const contract = getContract({ address, abi: ERC7621_ABI, client });
-  return contract.read.getWeight([token]) as Promise<bigint>;
+  const contract: any = getContract({ address, abi: ALVARA_BSKT_ABI, client });
+  return contract.read.totalTokens() as Promise<bigint>;
 }
 
 /**
- * Get the reserve amount of a specific token held by the BSKT.
+ * Get the owner of a BSKT (Alvara's getOwner()).
  */
-export async function getReserve(
-  client: PublicClient,
-  address: Address,
-  token: Address,
-): Promise<bigint> {
-  const contract = getContract({ address, abi: ERC7621_ABI, client });
-  return contract.read.getReserve([token]) as Promise<bigint>;
-}
-
-/**
- * Get the total supply of BSKT LP tokens.
- */
-export async function totalSupply(
-  client: PublicClient,
-  address: Address,
-): Promise<bigint> {
-  const contract = getContract({ address, abi: ERC7621_ABI, client });
-  return contract.read.totalSupply() as Promise<bigint>;
-}
-
-/**
- * Get the total basket value in the BSKT's native denomination.
- */
-export async function totalBasketValue(
-  client: PublicClient,
-  address: Address,
-): Promise<bigint> {
-  try {
-    const contract = getContract({ address, abi: ERC7621_ABI, client });
-    return await contract.read.totalBasketValue() as bigint;
-  } catch {
-    // Some implementations may not have this
-    return 0n;
-  }
-}
-
-/**
- * Get the owner of a BSKT (ERC-173).
- */
-export async function owner(
-  client: PublicClient,
+export async function getOwner(
+  client: AnyPublicClient,
   address: Address,
 ): Promise<Address> {
-  const contract = getContract({ address, abi: ERC7621_ABI, client });
-  return contract.read.owner() as Promise<Address>;
+  const contract: any = getContract({ address, abi: ALVARA_BSKT_ABI, client });
+  return contract.read.getOwner() as Promise<Address>;
 }
 
 /**
- * Get the name and symbol of a BSKT (ERC-20 metadata).
+ * Get the factory address that deployed this BSKT.
+ */
+export async function getFactory(
+  client: AnyPublicClient,
+  address: Address,
+): Promise<Address> {
+  const contract: any = getContract({ address, abi: ALVARA_BSKT_ABI, client });
+  return contract.read.factory() as Promise<Address>;
+}
+
+/**
+ * Get the name, symbol, and description of a BSKT.
  */
 export async function getMetadata(
-  client: PublicClient,
+  client: AnyPublicClient,
   address: Address,
-): Promise<{ name: string; symbol: string; decimals: number }> {
-  const contract = getContract({ address, abi: ERC7621_ABI, client });
-  const [name, symbol, decimals] = await Promise.all([
-    contract.read.name() as Promise<string>,
-    contract.read.symbol() as Promise<string>,
-    contract.read.decimals() as Promise<number>,
-  ]);
-  return { name, symbol, decimals };
+): Promise<{ name: string; symbol: string; description: string }> {
+  const contract: any = getContract({ address, abi: ALVARA_BSKT_ABI, client });
+  const delay = () => new Promise(r => setTimeout(r, 250));
+
+  const name = await contract.read.name() as string;
+  await delay();
+  const symbol = await contract.read.symbol() as string;
+  await delay();
+  const description = await contract.read.description() as string;
+  return { name, symbol, description };
 }
 
 // ── Full Verification ──────────────────────────────────────────────────────
 
 /**
- * Run a complete ERC-7621 compliance check on a BSKT address.
+ * Run a compliance check on a BSKT address using Alvara's actual on-chain interface.
+ * Checks: ERC-721 support, token details, weights, ownership, factory link.
  * Returns a structured JSON report.
  */
 export async function verifyBSKT(
-  client: PublicClient,
+  client: AnyPublicClient,
   bsktAddr: string,
   expectedOwner?: string,
 ): Promise<BSKTVerificationReport> {
   const address = validateAddress(bsktAddr, 'BSKT address');
   const checks: { name: string; passed: boolean; value: string }[] = [];
+  const delay = () => new Promise(r => setTimeout(r, 250));
 
   // 1. ERC-165 support
   const erc165Supported = await supportsInterface(client, address, ERC165_INTERFACE_ID);
   checks.push({ name: 'ERC-165 supported', passed: erc165Supported, value: String(erc165Supported) });
+  await delay();
 
-  // 2. ERC-7621 interface support
+  // 2. ERC-721 interface support (BSKTs are ERC-721 NFTs)
+  const erc721Supported = await supportsInterface(client, address, ERC721_INTERFACE_ID);
+  checks.push({ name: 'ERC-721 interface', passed: erc721Supported, value: String(erc721Supported) });
+  await delay();
+
+  // 3. ERC-7621 interface support (informational — Alvara returns false)
   const erc7621Supported = await supportsInterface(client, address, ERC7621_INTERFACE_ID);
-  checks.push({ name: 'ERC-7621 interface', passed: erc7621Supported, value: String(erc7621Supported) });
+  checks.push({ name: 'ERC-7621 interface (informational)', passed: true, value: String(erc7621Supported) }); // Pass regardless — informational only
+  await delay();
 
-  // 3. Constituents
+  // 4. Constituents via getTokenDetails()
   let constituents: { token: Address; weight: string }[] = [];
   let totalWeightBps = 0n;
   try {
@@ -290,23 +302,25 @@ export async function verifyBSKT(
       value: String(totalWeightBps),
     });
   } catch (err: unknown) {
-    checks.push({ name: 'constituents non-empty', passed: false, value: `error: ${(err as Error).message}` });
+    checks.push({ name: 'constituents non-empty', passed: false, value: `error: ${(err as Error).message?.slice(0, 200)}` });
     checks.push({ name: 'weights sum to 10000', passed: false, value: 'error' });
   }
+  await delay();
 
-  // 4. Total supply
-  let supply = 0n;
+  // 5. totalTokens > 0
+  let tokenCount = 0n;
   try {
-    supply = await totalSupply(client, address);
-    checks.push({ name: 'totalSupply > 0', passed: supply > 0n, value: String(supply) });
+    tokenCount = await totalTokens(client, address);
+    checks.push({ name: 'totalTokens > 0', passed: tokenCount > 0n, value: String(tokenCount) });
   } catch (err: unknown) {
-    checks.push({ name: 'totalSupply > 0', passed: false, value: `error: ${(err as Error).message}` });
+    checks.push({ name: 'totalTokens > 0', passed: false, value: `error: ${(err as Error).message?.slice(0, 200)}` });
   }
+  await delay();
 
-  // 5. Owner
+  // 6. Owner
   let ownerAddr: Address = '0x0000000000000000000000000000000000000000' as Address;
   try {
-    ownerAddr = await owner(client, address);
+    ownerAddr = await getOwner(client, address);
     const ownerCheck = expectedOwner
       ? getAddress(ownerAddr) === getAddress(expectedOwner)
       : ownerAddr !== '0x0000000000000000000000000000000000000000';
@@ -316,20 +330,37 @@ export async function verifyBSKT(
       value: ownerAddr,
     });
   } catch (err: unknown) {
-    checks.push({ name: 'owner readable', passed: false, value: `error: ${(err as Error).message}` });
+    checks.push({ name: 'owner readable', passed: false, value: `error: ${(err as Error).message?.slice(0, 200)}` });
   }
+  await delay();
 
-  // 6. Metadata
+  // 7. Factory link
+  let factoryAddr: Address = '0x0000000000000000000000000000000000000000' as Address;
+  try {
+    factoryAddr = await getFactory(client, address);
+    checks.push({
+      name: 'factory is non-zero',
+      passed: factoryAddr !== '0x0000000000000000000000000000000000000000',
+      value: factoryAddr,
+    });
+  } catch (err: unknown) {
+    checks.push({ name: 'factory readable', passed: false, value: `error: ${(err as Error).message?.slice(0, 200)}` });
+  }
+  await delay();
+
+  // 8. Metadata
   let name = '';
   let symbol = '';
+  let description = '';
   try {
     const meta = await getMetadata(client, address);
     name = meta.name;
     symbol = meta.symbol;
+    description = meta.description;
     checks.push({ name: 'has name', passed: name.length > 0, value: name });
     checks.push({ name: 'has symbol', passed: symbol.length > 0, value: symbol });
   } catch (err: unknown) {
-    checks.push({ name: 'has name', passed: false, value: `error: ${(err as Error).message}` });
+    checks.push({ name: 'has name', passed: false, value: `error: ${(err as Error).message?.slice(0, 200)}` });
   }
 
   const allPassed = checks.every(c => c.passed);
@@ -337,13 +368,16 @@ export async function verifyBSKT(
   return {
     verified: allPassed,
     bsktAddress: address,
-    interfaceSupported: erc7621Supported,
+    erc721Supported,
+    erc7621Supported,
     name,
     symbol,
+    description,
     constituents,
     totalWeightBps: String(totalWeightBps),
-    totalSupply: String(supply),
+    totalTokens: String(tokenCount),
     owner: ownerAddr,
+    factory: factoryAddr,
     checks,
   };
 }

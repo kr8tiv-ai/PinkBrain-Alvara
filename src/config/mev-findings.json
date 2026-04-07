@@ -1,0 +1,146 @@
+{
+  "mevRequired": true,
+  "factoryAddress": "0x9Ee08080161D443112ab5d9a3Ca96010E569E229",
+  "analysisTimestamp": "2026-04-07T06:12:37.279Z",
+  "factoryState": {
+    "totalBSKT": "143",
+    "minBSKTCreationAmount": "0.00001",
+    "paused": false,
+    "router": "0x111111125421cA6dc452d289314280a0f8842A65",
+    "minPercentALVA": 500
+  },
+  "signingParams": [
+    "_signature",
+    "_swapData"
+  ],
+  "sampleTxHashes": [
+    "0xa22ab0454a08b9122a1eb838c28b80e0ad790efdca9c89c713a39a6ab08142f8",
+    "0xa8e93eb113f84f9f341b5446088ec186374947a9c85a1f4e36f5b9dc91c19992",
+    "0x39d37ef0d14e64436ed409a0a1f13cc07c51c8de924058c527f782e69133d71b",
+    "0x3874b134c0326ad38fe1a7d12efed47382dade1ad394287aaf97797dddc538bb",
+    "0x317794920c0e58bbe369995e3cd4b244b25e1c19d292886d3dc16ce6bcee74ec"
+  ],
+  "observedDeadlines": [
+    "1772723124",
+    "1772662217",
+    "1772660237",
+    "1772634021",
+    "1772553673"
+  ],
+  "swapDataPatterns": [
+    {
+      "txHash": "0xa22ab0454a08b9122a1eb838c28b80e0ad790efdca9c89c713a39a6ab08142f8",
+      "name": "ggg",
+      "symbol": "ggg",
+      "tokenCount": 2,
+      "tokens": [
+        "0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb",
+        "0x4B6104755AfB5Da4581B81C552DA3A25608c73B8"
+      ],
+      "weights": [
+        "8800",
+        "1200"
+      ],
+      "swapDataCount": 2,
+      "swapDataLengths": [
+        1810,
+        1362
+      ],
+      "hasNonEmptySwaps": true,
+      "signatureLength": 132,
+      "deadline": "1772723124",
+      "deadlineDate": "2026-03-05T15:05:24.000Z"
+    },
+    {
+      "txHash": "0xa8e93eb113f84f9f341b5446088ec186374947a9c85a1f4e36f5b9dc91c19992",
+      "name": "fff",
+      "symbol": "fff",
+      "tokenCount": 1,
+      "tokens": [
+        "0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb"
+      ],
+      "weights": [
+        "10000"
+      ],
+      "swapDataCount": 1,
+      "swapDataLengths": [
+        1810
+      ],
+      "hasNonEmptySwaps": true,
+      "signatureLength": 132,
+      "deadline": "1772662217",
+      "deadlineDate": "2026-03-04T22:10:17.000Z"
+    },
+    {
+      "txHash": "0x39d37ef0d14e64436ed409a0a1f13cc07c51c8de924058c527f782e69133d71b",
+      "name": "eee",
+      "symbol": "eee",
+      "tokenCount": 1,
+      "tokens": [
+        "0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb"
+      ],
+      "weights": [
+        "10000"
+      ],
+      "swapDataCount": 1,
+      "swapDataLengths": [
+        1810
+      ],
+      "hasNonEmptySwaps": true,
+      "signatureLength": 132,
+      "deadline": "1772660237",
+      "deadlineDate": "2026-03-04T21:37:17.000Z"
+    },
+    {
+      "txHash": "0x3874b134c0326ad38fe1a7d12efed47382dade1ad394287aaf97797dddc538bb",
+      "name": "asasas",
+      "symbol": "asassa",
+      "tokenCount": 1,
+      "tokens": [
+        "0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb"
+      ],
+      "weights": [
+        "10000"
+      ],
+      "swapDataCount": 1,
+      "swapDataLengths": [
+        1810
+      ],
+      "hasNonEmptySwaps": true,
+      "signatureLength": 132,
+      "deadline": "1772634021",
+      "deadlineDate": "2026-03-04T14:20:21.000Z"
+    },
+    {
+      "txHash": "0x317794920c0e58bbe369995e3cd4b244b25e1c19d292886d3dc16ce6bcee74ec",
+      "name": "sdsddscc",
+      "symbol": "sdsddscc",
+      "tokenCount": 2,
+      "tokens": [
+        "0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb",
+        "0x4B6104755AfB5Da4581B81C552DA3A25608c73B8"
+      ],
+      "weights": [
+        "500",
+        "9500"
+      ],
+      "swapDataCount": 2,
+      "swapDataLengths": [
+        1810,
+        1362
+      ],
+      "hasNonEmptySwaps": true,
+      "signatureLength": 132,
+      "deadline": "1772553673",
+      "deadlineDate": "2026-03-03T16:01:13.000Z"
+    }
+  ],
+  "signatureLengths": [
+    132,
+    132,
+    132,
+    132,
+    132
+  ],
+  "recommendation": "Analyzed 5 recent createBSKT transactions. All contain non-empty _signature parameters (lengths: 132, 132, 132, 132, 132 chars). This confirms the factory requires backend-signed swap route data for MEV protection. To create BSKTs programmatically: (1) Integrate with Alvara's backend API to obtain signed swap routes (recommended), or (2) Analyze the signing scheme from observed signatures. The _swapData array contains pre-computed DEX swap routes that the factory executes to swap ETH into constituent tokens. The _signature validates these routes were approved by Alvara's backend, preventing front-running. Deadline param provides time-bounded validity."
+}

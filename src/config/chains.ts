@@ -28,9 +28,9 @@ export const PROXY_SLOTS = {
 
 /** Base RPC endpoints — primary + fallback */
 const BASE_RPCS = [
-  'https://mainnet.base.org',
-  'https://base.meowrpc.com',
   'https://base.drpc.org',
+  'https://base.meowrpc.com',
+  'https://mainnet.base.org',
 ];
 
 /**

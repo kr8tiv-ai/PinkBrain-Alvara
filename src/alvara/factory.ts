@@ -96,25 +96,33 @@ export function loadFactoryConfig(): FactoryConfig {
  * Read current factory state (total BSKTs, min amount, paused, etc.)
  */
 export async function getFactoryState(
-  client: PublicClient,
+  client: AnyPublicClient,
   config: FactoryConfig,
 ): Promise<FactoryState> {
-  const contract = getContract({
+  const contract: any = getContract({
     address: config.factoryAddress,
     abi: config.abi,
     client,
   });
 
-  const [totalBSKT, minAmount, paused, router, weth, alva, bsktImpl, minPercentALVA] = await Promise.all([
-    contract.read.totalBSKT() as Promise<bigint>,
-    contract.read.minBSKTCreationAmount() as Promise<bigint>,
-    contract.read.paused() as Promise<boolean>,
-    contract.read.router() as Promise<Address>,
-    contract.read.weth() as Promise<Address>,
-    contract.read.alva() as Promise<Address>,
-    contract.read.bsktImplementation() as Promise<Address>,
-    contract.read.minPercentALVA() as Promise<number>,
-  ]);
+  // Sequential reads with small delay to avoid public RPC rate limits
+  const delay = () => new Promise(r => setTimeout(r, 250));
+
+  const totalBSKT = await contract.read.totalBSKT() as bigint;
+  await delay();
+  const minAmount = await contract.read.minBSKTCreationAmount() as bigint;
+  await delay();
+  const paused = await contract.read.paused() as boolean;
+  await delay();
+  const router = await contract.read.router() as Address;
+  await delay();
+  const weth = await contract.read.weth() as Address;
+  await delay();
+  const alva = await contract.read.alva() as Address;
+  await delay();
+  const bsktImpl = await contract.read.bsktImplementation() as Address;
+  await delay();
+  const minPercentALVA = await contract.read.minPercentALVA() as number;
 
   return {
     totalBSKT,
@@ -132,11 +140,11 @@ export async function getFactoryState(
  * Get a BSKT address by index from the factory's bsktList.
  */
 export async function getBSKTAtIndex(
-  client: PublicClient,
+  client: AnyPublicClient,
   config: FactoryConfig,
   index: bigint,
 ): Promise<Address> {
-  const contract = getContract({
+  const contract: any = getContract({
     address: config.factoryAddress,
     abi: config.abi,
     client,
@@ -154,7 +162,7 @@ export async function getBSKTAtIndex(
  */
 export async function createBasket(
   walletClient: WalletClient,
-  publicClient: PublicClient,
+  publicClient: AnyPublicClient,
   config: FactoryConfig,
   params: CreateBasketParams,
 ): Promise<CreateBasketResult> {
@@ -266,7 +274,7 @@ export async function createBasket(
       });
 
       if (decoded.eventName === 'BSKTCreated') {
-        const args = decoded.args as Record<string, unknown>;
+        const args = decoded.args as any;
         result.bsktAddress = args.bskt as Address;
         result.bsktPairAddress = args.bsktPair as Address;
         result.creator = args.creator as Address;
