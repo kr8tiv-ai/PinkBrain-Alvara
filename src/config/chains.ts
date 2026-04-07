@@ -13,6 +13,8 @@ export const KNOWN_ADDRESSES = {
   USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as Address,
   /** USDbC (bridged USDC) on Base */
   USDbC: '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA' as Address,
+  /** USDT (Tether) on Base */
+  USDT: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2' as Address,
 } as const;
 
 /** ERC-7621 interface ID for supportsInterface check */

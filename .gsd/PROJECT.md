@@ -20,20 +20,20 @@ All six critical subsystems proven independently and the outbound pipeline wired
 
 | Slice | Status | Summary |
 |---|---|---|
-| S01: Alvara Backend API & BSKT Investment | ✅ Complete | Typed API client (4 endpoints), contribute orchestration, CLI with dry-run, 50 tests. S02/S03 can import directly. |
-| S02: Accumulation Scheduler & Automated Pipeline | ⬜ Next | Wire S01 into automated pipeline with threshold trigger |
-| S03: Rebalancing & Emergency Controls | ⬜ Pending | Rebalance + emergency stables using S01's API client |
+| S01: Alvara Backend API & BSKT Investment | ✅ Complete | Typed API client (4 endpoints), contribute orchestration, CLI with dry-run, 50 tests. |
+| S02: Accumulation Scheduler & Automated Pipeline | ✅ Complete | BullMQ scheduler, 5-phase pipeline (claim→swap→fee→bridge→invest), checkpoint crash recovery, 57 new tests (250 total). |
+| S03: Rebalancing & Emergency Controls | ⬜ Next | Rebalance + emergency stables using S01's API client |
 | S04: On-Chain Divestment Config Registry | ⬜ Pending | Solidity contract + TypeScript client |
 | S05: REST API & Fund Management | ⬜ Pending | Fastify REST API wiring all subsystems |
 
-**S01 Delivered:**
-- `src/alvara/api.ts` — Typed Alvara backend API client with getContributeRoutes, getCreateBSKTRoutes, getRebalanceRoutes, getWithdrawETHRoutes
-- `src/alvara/contribute.ts` — Full contribute-to-BSKT orchestration (resolve pair → LP balance → routes → gas → tx → verify)
-- `src/alvara/bskt-pair.ts` — Typed BSKTPair contract module for LP queries
-- `src/config/bskt-logic-abi.json` — BSKT NFT ABI with contribute, rebalance, withdraw, withdrawETH, claimFee
-- `src/config/bskt-pair-abi.json` — BSKTPair ABI (35 functions)
-- `scripts/contribute-bskt.ts` — CLI with --bskt-address, --amount, --dry-run
-- Pipeline types extended with investTxHash/amountInvested for S02
+**S02 Delivered:**
+- `src/scheduler/` — BullMQ-based accumulation scheduler: Redis connection singleton, queue factory, Worker that polls active funds on cron (default every 6 hours), checks SOL balance against configurable threshold, enforces concurrency guard, dispatches pipeline
+- `src/evm/swap.ts` — USDC→ETH swap via 1inch Swap API v6.0 on Base (allowance check, approve, fetch calldata, send, confirm)
+- Pipeline phase 5 (investing): swaps bridged USDC to ETH, contributes ETH to Alvara BSKT via S01's contributeToBSKT
+- Checkpoint persistence for all 5 pipeline phases with advisory writes and resumeOutboundPipeline() for crash recovery
+- `scripts/start-scheduler.ts` — CLI entry point with --cron flag, graceful shutdown
+- DB schema: accumulationThresholdLamports, lastPipelineRunAt on funds; bskt_contribute operation enum
+- Docker: Redis 7 Alpine service with health check
 
 ## Architecture / Key Patterns
 
@@ -50,7 +50,7 @@ All six critical subsystems proven independently and the outbound pipeline wired
 - viem for EVM interaction (established in M001/S01)
 - vitest for unit testing (established in M001/S02)
 - Drizzle ORM + node-postgres for fund data persistence (established in M001/S05)
-- PostgreSQL 16 + Redis/BullMQ for state and job queues
+- PostgreSQL 16 + Redis 7 / BullMQ for state and job queues
 - Foundry for Solidity contracts
 
 **Key constraints:**
@@ -62,18 +62,20 @@ All six critical subsystems proven independently and the outbound pipeline wired
 - Distribution to top 100 holders by token balance (not a separate staking contract)
 - Alvara backend API base URL not yet confirmed — defaults to https://api.alvara.xyz, configurable via ALVARA_API_URL
 
-**Established patterns (M001 + M002/S01):**
+**Established patterns (M001 + M002/S01-S02):**
 - Blockscout free API for Base chain (Etherscan V2 optional fallback with paid key)
 - EIP-1967 proxy detection for Alvara contract resolution
 - Beacon proxy ABI resolution — factory.*Implementation() → beacon.implementation() → Blockscout verified ABI
 - Structured JSON logging with module/phase/action fields
-- Thin REST API clients with typed inputs/outputs, runtime response validation (deBridge + Jupiter + Alvara pattern)
+- Thin REST API clients with typed inputs/outputs, runtime response validation (deBridge + Jupiter + Alvara + 1inch patterns)
 - SDK wrapper with mock injection — functions accept SDK instance, not raw API key (Bags pattern)
-- EVM contribute orchestration — resolve pair → read LP → fetch routes → estimate gas → send with buffer → confirm → verify LP
+- EVM contribute orchestration — resolve pair → read LP → fetch routes → gas → tx → confirm → verify LP
 - Dual-mode CLI scripts: safe estimate/dry-run vs full execution
 - vitest with fetch mocking and SDK mock injection for unit tests
 - Integration tests skip gracefully when infrastructure unavailable (ctx.skip() pattern)
-- Four-phase pipeline orchestration with per-phase DB state tracking
+- Five-phase pipeline orchestration with per-phase checkpoint persistence and crash recovery
+- Advisory checkpoint writes — failures logged but never block pipeline
+- BullMQ Worker with per-fund error isolation and concurrency guards
 - Raw SPL Token instruction building from @solana/web3.js primitives
 
 ## Capability Contract
@@ -83,6 +85,6 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 ## Milestone Sequence
 
 - [x] M001: Risk Retirement & Subsystem Proof — COMPLETE ✅
-- [ ] M002: Outbound Pipeline (Solana → Alvara) — S01 complete, S02-S05 remaining
+- [ ] M002: Outbound Pipeline (Solana → Alvara) — S01-S02 complete, S03-S05 remaining
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation
