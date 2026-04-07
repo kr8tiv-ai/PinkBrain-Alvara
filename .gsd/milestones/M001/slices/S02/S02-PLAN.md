@@ -64,7 +64,7 @@ Solana chain IDs for deBridge: `7565164`. Base chain ID: `8453`.
   - Estimate: 1h
   - Files: src/debridge/types.ts, src/debridge/api.ts, src/config/solana.ts, tests/debridge-api.test.ts, package.json, vitest.config.ts, .env.example
   - Verify: `npx tsc --noEmit` exits 0 AND `npx vitest run` exits 0 with all tests passing
-- [ ] **T02: Build Solana transaction preparation utility** — **Slice:** S02 — deBridge Solana→Base Bridge Proof
+- [x] **T02: Fixed 2 failing test assertions for hex validation order and verified all 37 tests pass with clean TypeScript compilation** — **Slice:** S02 — deBridge Solana→Base Bridge Proof
 **Milestone:** M001
 
 ## Description
@@ -119,7 +119,7 @@ Key constraints from research:
   - Estimate: 45m
   - Files: src/debridge/solana-tx.ts, tests/solana-tx.test.ts
   - Verify: `npx tsc --noEmit` exits 0 AND `npx vitest run` exits 0
-- [ ] **T03: Wire bridge execution script, status checker, and run dry-run estimation** — **Slice:** S02 — deBridge Solana→Base Bridge Proof
+- [x] **T03: Created bridge/status scripts and proved deBridge DLN API connectivity with live Solana→Base USDC estimation returning non-zero amounts** — **Slice:** S02 — deBridge Solana→Base Bridge Proof
 **Milestone:** M001
 
 ## Description

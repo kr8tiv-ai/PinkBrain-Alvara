@@ -7,7 +7,10 @@
     "discover": "tsx scripts/discover-factory.ts",
     "create-bskt": "tsx scripts/create-bskt.ts",
     "verify-bskt": "tsx scripts/verify-bskt.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bridge": "tsx scripts/bridge-sol-to-base.ts",
+    "bridge-estimate": "tsx scripts/bridge-sol-to-base.ts --estimate-only",
+    "bridge-status": "tsx scripts/check-bridge-status.ts"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",

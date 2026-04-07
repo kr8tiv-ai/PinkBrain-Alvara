@@ -98,19 +98,20 @@ describe('createBridgeOrder', () => {
     const input = validOrderInput();
     const result = await createBridgeOrder(input);
 
-    // Verify fetch was called with correct URL
+    // Verify fetch was called with correct URL (GET with query params)
     expect(mocked()).toHaveBeenCalledOnce();
     const [url, init] = mocked().mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://dln.debridge.finance/v1.0/dln/order/create-tx');
-    expect(init.method).toBe('POST');
+    expect(init.method).toBe('GET');
 
-    // Verify params in body
-    const body = new URLSearchParams(init.body as string);
-    expect(body.get('srcChainId')).toBe(String(DeBridgeChainId.SOLANA));
-    expect(body.get('srcChainTokenIn')).toBe('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-    expect(body.get('srcChainTokenInAmount')).toBe('1000000');
-    expect(body.get('dstChainId')).toBe(String(DeBridgeChainId.BASE));
-    expect(body.get('prependOperatingExpenses')).toBe('true');
+    // Verify params are in the URL query string
+    const parsedUrl = new URL(url);
+    expect(parsedUrl.pathname).toBe('/v1.0/dln/order/create-tx');
+    expect(parsedUrl.searchParams.get('srcChainId')).toBe(String(DeBridgeChainId.SOLANA));
+    expect(parsedUrl.searchParams.get('srcChainTokenIn')).toBe('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+    expect(parsedUrl.searchParams.get('srcChainTokenInAmount')).toBe('1000000');
+    expect(parsedUrl.searchParams.get('dstChainId')).toBe(String(DeBridgeChainId.BASE));
+    expect(parsedUrl.searchParams.get('prependOperatingExpenses')).toBe('true');
+    expect(parsedUrl.searchParams.get('dstChainTokenOutAmount')).toBe('auto');
 
     // Verify response is typed correctly
     expect(result.orderId).toBe('order-abc-123');

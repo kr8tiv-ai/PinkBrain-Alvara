@@ -105,7 +105,14 @@ export async function createBridgeOrder(
     searchParams.set('dstChainTokenOutRecipient', input.dstChainTokenOutRecipient);
   }
 
-  const url = `${DLN_API_BASE}/dln/order/create-tx`;
+  // deBridge requires dstChainTokenOutAmount — default to 'auto' to let the API calculate
+  if (input.dstChainTokenOutAmount) {
+    searchParams.set('dstChainTokenOutAmount', input.dstChainTokenOutAmount);
+  } else {
+    searchParams.set('dstChainTokenOutAmount', 'auto');
+  }
+
+  const url = `${DLN_API_BASE}/dln/order/create-tx?${searchParams.toString()}`;
 
   log('bridge', 'createOrder:start', {
     srcChainId: input.srcChainId,
@@ -115,11 +122,7 @@ export async function createBridgeOrder(
 
   const res = await fetchWithTimeout(
     url,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: searchParams.toString(),
-    },
+    { method: 'GET' },
     DLN_TIMEOUT_MS
   );
 

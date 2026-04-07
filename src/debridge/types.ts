@@ -30,6 +30,8 @@ export interface DeBridgeOrderInput {
   dstChainTokenOut: string;
   /** Recipient address on destination chain — optional for estimation */
   dstChainTokenOutRecipient?: string;
+  /** Desired output amount — use 'auto' to let the API calculate (recommended) */
+  dstChainTokenOutAmount?: string;
   /** Whether to prepend operating expenses to the order amount */
   prependOperatingExpenses: boolean;
 }

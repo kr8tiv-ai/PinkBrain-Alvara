@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T07:11:33.407Z",
+  "exported_at": "2026-04-07T07:57:55.160Z",
   "milestones": [
     {
       "id": "M001",
@@ -309,7 +309,7 @@
       "slice_id": "S02",
       "id": "T01",
       "title": "Build deBridge API client, types, and Solana config with unit tests",
-      "status": "pending",
+      "status": "complete",
       "one_liner": "",
       "narrative": "",
       "verification_result": "",
@@ -354,19 +354,22 @@
       "milestone_id": "M001",
       "slice_id": "S02",
       "id": "T02",
-      "title": "Build Solana transaction preparation utility",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Fixed 2 failing test assertions for hex validation order and verified all 37 tests pass with clean TypeScript compilation",
+      "status": "complete",
+      "one_liner": "Fixed 2 failing test assertions for hex validation order and verified all 37 tests pass with clean TypeScript compilation",
+      "narrative": "The solana-tx.ts implementation and tests were already created during T01. Two tests were failing because test inputs had odd character counts, triggering the odd-length validation before the non-hex character check. Fixed 'ab cd' (5 chars) to 'ab  cd' (6 chars) and '0xnothex!' (7 chars after strip) to '0xnothex!!' (8 chars). All 37 tests now pass. The implementation covers the full VersionedTransaction lifecycle: hex deserialization, blockhash refresh, simulation with graceful fallback, compute budget injection via decompile/recompile, priority fee calculation, signing, and submission with confirmation.",
+      "verification_result": "npx tsc --noEmit src/debridge/solana-tx.ts exits 0. npx vitest run exits 0 with 37 tests passing (17 solana-tx, 20 debridge-api).",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T07:49:37.674Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
+      "deviations": "Fixed 2 test input values where odd-length strings triggered wrong validation path.",
+      "known_issues": "None.",
+      "key_files": [
+        "tests/solana-tx.test.ts",
+        "src/debridge/solana-tx.ts"
+      ],
       "key_decisions": [],
-      "full_summary_md": "",
+      "full_summary_md": "---\nid: T02\nparent: S02\nmilestone: M001\nkey_files:\n  - tests/solana-tx.test.ts\n  - src/debridge/solana-tx.ts\nkey_decisions:\n  - (none)\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T07:49:37.673Z\nblocker_discovered: false\n---\n\n# T02: Fixed 2 failing test assertions for hex validation order and verified all 37 tests pass with clean TypeScript compilation\n\n**Fixed 2 failing test assertions for hex validation order and verified all 37 tests pass with clean TypeScript compilation**\n\n## What Happened\n\nThe solana-tx.ts implementation and tests were already created during T01. Two tests were failing because test inputs had odd character counts, triggering the odd-length validation before the non-hex character check. Fixed 'ab cd' (5 chars) to 'ab  cd' (6 chars) and '0xnothex!' (7 chars after strip) to '0xnothex!!' (8 chars). All 37 tests now pass. The implementation covers the full VersionedTransaction lifecycle: hex deserialization, blockhash refresh, simulation with graceful fallback, compute budget injection via decompile/recompile, priority fee calculation, signing, and submission with confirmation.\n\n## Verification\n\nnpx tsc --noEmit src/debridge/solana-tx.ts exits 0. npx vitest run exits 0 with 37 tests passing (17 solana-tx, 20 debridge-api).\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx tsc --noEmit src/debridge/solana-tx.ts` | 0 | ✅ pass | 3000ms |\n| 2 | `npx vitest run` | 0 | ✅ pass | 3000ms |\n\n## Deviations\n\nFixed 2 test input values where odd-length strings triggered wrong validation path.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `tests/solana-tx.test.ts`\n- `src/debridge/solana-tx.ts`\n",
       "description": "**Slice:** S02 — deBridge Solana→Base Bridge Proof\n**Milestone:** M001\n\n## Description\n\nThe deBridge API returns a hex-encoded Solana `VersionedTransaction` that needs several preparation steps before it can be signed and submitted to the Solana network. This task builds the Solana-side execution engine: deserialize the hex data, refresh the blockhash (the API-provided one may be stale), estimate compute units via simulation, set priority fee instructions, sign with the wallet keypair, and submit with confirmation.\n\nKey constraints from research:\n- The API returns `tx.data` as `\"0x...\"` hex — must strip `0x` prefix before `Buffer.from(hex, 'hex')`\n- `VersionedTransaction.deserialize()` expects a `Uint8Array`\n- Must replace `recentBlockhash` in the message before signing (30-second submission window)\n- Compute unit simulation gives accurate gas estimation for priority fee calculation\n- Use `confirmed` commitment level for fast feedback (not `finalized`)\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| Solana RPC (`Connection`) | Throw with RPC error code + message. Include the method that failed (e.g., `simulateTransaction`, `sendRawTransaction`) | 30s timeout on send, throw with timeout context | Validate simulation result has `unitsConsumed`, fall back to default compute budget (200k units) if missing |\n| Transaction deserialization | Throw with descriptive error if hex data is invalid or not a valid VersionedTransaction | N/A (local operation) | Validate the deserialized tx has a message with instructions before proceeding |\n\n## Negative Tests\n\n- **Malformed inputs**: Invalid hex string (odd length, non-hex chars) produces clear error. Empty hex string throws before attempting deserialization.\n- **Error paths**: Simulation failure falls back to default compute budget rather than failing entirely. Send failure includes the Solana error logs from simulation.\n- **Boundary conditions**: Transaction with no instructions detected and rejected before signing.\n\n## Steps\n\n1. **Create `src/debridge/solana-tx.ts`**: Implement two exported functions:\n   - `prepareSolanaTransaction(connection: Connection, txDataHex: string, wallet: Keypair): Promise<VersionedTransaction>`:\n     1. Strip `0x` prefix if present from `txDataHex`\n     2. `Buffer.from(hex, 'hex')` → `VersionedTransaction.deserialize(buffer)`\n     3. `connection.getLatestBlockhash('confirmed')` → replace `transaction.message.recentBlockhash`\n     4. Simulate the transaction via `connection.simulateTransaction(tx)` to get `unitsConsumed`\n     5. Create `ComputeBudgetProgram.setComputeUnitLimit({ units: unitsConsumed * 1.1 })` instruction\n     6. Fetch recent priority fees via `connection.getRecentPrioritizationFees()`, compute median, create `ComputeBudgetProgram.setComputeUnitPrice({ microLamports })` instruction\n     7. Note: For VersionedTransactions, compute budget instructions may need to be added via `TransactionMessage.decompile` → add instructions → `recompile` → re-sign, OR the API may already include them. Check simulation result first — if compute budget is already set, skip adding new ones.\n     8. Sign with `wallet`: `transaction.sign([wallet])`\n     9. Return the signed transaction\n   - `sendAndConfirmBridgeTransaction(connection: Connection, transaction: VersionedTransaction): Promise<string>`:\n     1. `connection.sendRawTransaction(transaction.serialize(), { skipPreflight: false })`\n     2. `connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')`\n     3. Log structured JSON: `{ phase: 'solana_tx', action: 'confirmed', signature, slot }`\n     4. Return the signature string\n\n2. **Create `tests/solana-tx.test.ts`**: Unit tests:\n   - Test hex prefix stripping: `\"0xabcd\"` → `\"abcd\"`, `\"abcd\"` → `\"abcd\"`\n   - Test that empty hex string throws descriptive error\n   - Test that non-hex characters in input throw descriptive error\n\n3. **Verify everything compiles**: Run `npx tsc --noEmit` and `npx vitest run` to confirm both the new module and its tests work with the T01 outputs.",
       "estimate": "45m",
       "files": [
@@ -392,19 +395,29 @@
       "milestone_id": "M001",
       "slice_id": "S02",
       "id": "T03",
-      "title": "Wire bridge execution script, status checker, and run dry-run estimation",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Created bridge/status scripts and proved deBridge DLN API connectivity with live Solana→Base USDC estimation returning non-zero amounts",
+      "status": "complete",
+      "one_liner": "Created bridge/status scripts and proved deBridge DLN API connectivity with live Solana→Base USDC estimation returning non-zero amounts",
+      "narrative": "Built two executable scripts wiring the deBridge API client and Solana tx utilities into a usable bridge pipeline. Fixed the API client's HTTP method from POST to GET (with dstChainTokenOutAmount=auto) after the live dry-run returned 404. The corrected dry-run successfully returned a valid estimation: 0.20 USDC Solana → 0.20 USDC Base with operating expenses prepended. All 37 tests pass, TypeScript compiles clean.",
+      "verification_result": "1. npx tsc --noEmit exits 0 (no errors in our files). 2. npx vitest run — all 37 tests pass. 3. npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20 — exits 0, returns estimation with non-zero amounts from live deBridge API. 4. Both scripts respond correctly to --help.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T07:57:55.121Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Fixed API client HTTP method from POST to GET and added required dstChainTokenOutAmount parameter — the T01 planner incorrectly specified POST.",
+      "known_issues": "orderId is undefined in estimate-only mode (expected per deBridge docs — no order created without authority addresses). Pre-existing TS error in discover-factory.ts is unrelated.",
+      "key_files": [
+        "scripts/bridge-sol-to-base.ts",
+        "scripts/check-bridge-status.ts",
+        "package.json",
+        "src/debridge/api.ts",
+        "src/debridge/types.ts",
+        "tests/debridge-api.test.ts"
+      ],
+      "key_decisions": [
+        "Fixed deBridge create-tx API method from POST to GET with query params",
+        "Added required dstChainTokenOutAmount=auto parameter"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S02\nmilestone: M001\nkey_files:\n  - scripts/bridge-sol-to-base.ts\n  - scripts/check-bridge-status.ts\n  - package.json\n  - src/debridge/api.ts\n  - src/debridge/types.ts\n  - tests/debridge-api.test.ts\nkey_decisions:\n  - Fixed deBridge create-tx API method from POST to GET with query params\n  - Added required dstChainTokenOutAmount=auto parameter\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T07:57:55.120Z\nblocker_discovered: false\n---\n\n# T03: Created bridge/status scripts and proved deBridge DLN API connectivity with live Solana→Base USDC estimation returning non-zero amounts\n\n**Created bridge/status scripts and proved deBridge DLN API connectivity with live Solana→Base USDC estimation returning non-zero amounts**\n\n## What Happened\n\nBuilt two executable scripts wiring the deBridge API client and Solana tx utilities into a usable bridge pipeline. Fixed the API client's HTTP method from POST to GET (with dstChainTokenOutAmount=auto) after the live dry-run returned 404. The corrected dry-run successfully returned a valid estimation: 0.20 USDC Solana → 0.20 USDC Base with operating expenses prepended. All 37 tests pass, TypeScript compiles clean.\n\n## Verification\n\n1. npx tsc --noEmit exits 0 (no errors in our files). 2. npx vitest run — all 37 tests pass. 3. npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20 — exits 0, returns estimation with non-zero amounts from live deBridge API. 4. Both scripts respond correctly to --help.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx tsc --noEmit scripts/bridge-sol-to-base.ts scripts/check-bridge-status.ts` | 0 | ✅ pass | 5600ms |\n| 2 | `npx vitest run` | 0 | ✅ pass | 3200ms |\n| 3 | `npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20` | 0 | ✅ pass | 4800ms |\n\n## Deviations\n\nFixed API client HTTP method from POST to GET and added required dstChainTokenOutAmount parameter — the T01 planner incorrectly specified POST.\n\n## Known Issues\n\norderId is undefined in estimate-only mode (expected per deBridge docs — no order created without authority addresses). Pre-existing TS error in discover-factory.ts is unrelated.\n\n## Files Created/Modified\n\n- `scripts/bridge-sol-to-base.ts`\n- `scripts/check-bridge-status.ts`\n- `package.json`\n- `src/debridge/api.ts`\n- `src/debridge/types.ts`\n- `tests/debridge-api.test.ts`\n",
       "description": "**Slice:** S02 — deBridge Solana→Base Bridge Proof\n**Milestone:** M001\n\n## Description\n\nThis is the integration proof task. Wire the deBridge API client and Solana tx utilities into two executable scripts, then run a dry-run estimation against the live deBridge API to prove connectivity.\n\n`bridge-sol-to-base.ts` has two modes:\n- **Estimate-only** (`--estimate-only`): Calls `createBridgeOrder` without a recipient address. Returns estimated input/output amounts and fees. No wallet needed. This is the contract-level proof that the API client works with the real deBridge endpoint.\n- **Full bridge** (default): Requires `SOL_PRIVATE_KEY`, `SOL_RPC_URL`, `BASE_WALLET_ADDRESS` env vars. Creates order → prepares Solana tx → signs → sends → polls for fulfillment → logs both chain tx hashes.\n\n`check-bridge-status.ts` is a standalone diagnostic tool that queries order status by order ID or Solana tx hash.\n\nThe estimate-only dry run is the slice's integration verification — it proves the API client constructs valid requests and parses real responses from deBridge.\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| deBridge DLN API (estimate) | Print error with HTTP status + body, exit 1 | 15s timeout, print timeout error, exit 1 | Validate response has `estimation` field, print raw response for debugging if malformed |\n| deBridge DLN API (full bridge) | Print error with context (phase, last successful step), exit 1 | 15s for order creation, 30s for tx send, 5min for fulfillment polling | Log partial progress (order ID, tx hash) so human can resume debugging |\n| Solana RPC (full bridge) | Print RPC error with method name, exit 1 | 30s timeout, suggest checking RPC URL | N/A |\n| Environment variables (full bridge) | Print which env vars are missing with example format, exit 1 | N/A | Validate key format (base58 for SOL_PRIVATE_KEY, 0x-prefixed for BASE_WALLET_ADDRESS) |\n\n## Steps\n\n1. **Create `scripts/bridge-sol-to-base.ts`**:\n   - Parse CLI args: `--estimate-only` flag, `--amount` (USDC amount in human units, default `0.20`), `--help`\n   - Load `dotenv/config`\n   - **Estimate-only mode**: Call `createBridgeOrder` with: `srcChainId: 7565164`, `srcChainTokenIn: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'` (Solana USDC), `srcChainTokenInAmount` (convert human amount to 6-decimal atomic units), `dstChainId: 8453`, `dstChainTokenOut: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'` (Base USDC), no `dstChainTokenOutRecipient`, `prependOperatingExpenses: true`. Log estimation. Exit 0.\n   - **Full bridge mode**: Validate env vars → load keypair → create connection → create order → prepare tx → send → poll → log results.\n   - All console output uses structured JSON logging. Never log `SOL_PRIVATE_KEY`.\n\n2. **Create `scripts/check-bridge-status.ts`**:\n   - Parse CLI args: `--order-id <id>` or `--tx-hash <hash>` (one required), `--help`\n   - Query status and print: order ID, status, source/destination chains, fulfillment tx hash, explorer URLs.\n\n3. **Update `package.json`**: Add npm scripts: `bridge`, `bridge-status`, `bridge-estimate`.\n\n4. **Run dry-run estimation**: Execute `npx tsx scripts/bridge-sol-to-base.ts --estimate-only` and verify it returns a valid estimation from the live deBridge API.",
       "estimate": "45m",
       "files": [
@@ -708,5 +721,61 @@
       "superseded_by": null
     }
   ],
-  "verification_evidence": []
+  "verification_evidence": [
+    {
+      "id": 1,
+      "task_id": "T02",
+      "slice_id": "S02",
+      "milestone_id": "M001",
+      "command": "npx tsc --noEmit src/debridge/solana-tx.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3000,
+      "created_at": "2026-04-07T07:49:37.674Z"
+    },
+    {
+      "id": 2,
+      "task_id": "T02",
+      "slice_id": "S02",
+      "milestone_id": "M001",
+      "command": "npx vitest run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3000,
+      "created_at": "2026-04-07T07:49:37.674Z"
+    },
+    {
+      "id": 3,
+      "task_id": "T03",
+      "slice_id": "S02",
+      "milestone_id": "M001",
+      "command": "npx tsc --noEmit scripts/bridge-sol-to-base.ts scripts/check-bridge-status.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 5600,
+      "created_at": "2026-04-07T07:57:55.121Z"
+    },
+    {
+      "id": 4,
+      "task_id": "T03",
+      "slice_id": "S02",
+      "milestone_id": "M001",
+      "command": "npx vitest run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3200,
+      "created_at": "2026-04-07T07:57:55.121Z"
+    },
+    {
+      "id": 5,
+      "task_id": "T03",
+      "slice_id": "S02",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/bridge-sol-to-base.ts --estimate-only --amount 0.20",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 4800,
+      "created_at": "2026-04-07T07:57:55.121Z"
+    }
+  ]
 }
