@@ -53,6 +53,7 @@ export const operationEnum = pgEnum('operation', [
   'bskt_create',
   'bskt_rebalance',
   'bskt_redeem',
+  'bskt_contribute',
   'distribution',
 ]);
 
@@ -67,6 +68,10 @@ export const funds = pgTable('funds', {
   targetChain: chainEnum('target_chain').notNull(),
   protocolFeeBps: integer('protocol_fee_bps').notNull(),
   bsktAddress: text('bskt_address'),
+  accumulationThresholdLamports: text('accumulation_threshold_lamports')
+    .notNull()
+    .default('5000000000'), // 5 SOL in lamports
+  lastPipelineRunAt: timestamp('last_pipeline_run_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
