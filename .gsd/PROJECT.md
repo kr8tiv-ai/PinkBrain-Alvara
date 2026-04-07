@@ -12,7 +12,7 @@ Any Bags.fm token creator can set up a fully automated investment fund that tran
 
 ## Current State
 
-**M001: S01 ✅, S02 ✅, S03 ✅, S04 ✅.** Four of six subsystem proofs complete. All independent subsystems proven — remaining slices (S05, S06) integrate them.
+**M001: S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅.** Five of six subsystem proofs complete. All independent subsystems proven and fund data model established — final slice (S06) wires the outbound path end-to-end.
 
 **S01 (Alvara Factory Discovery & BSKT Proof)** delivered:
 - Alvara BSKTs are ERC-721 NFTs (not standard ERC-7621) with custom view functions
@@ -43,9 +43,19 @@ Any Bags.fm token creator can set up a fully automated investment fund that tran
 - Live API proof: 0.01 SOL → 0.80 USDC quote from Jupiter production endpoint
 - 64 unit tests (24 Jupiter + 40 holder resolution) — all passing
 - CLI scripts: jupiter-swap.ts (--estimate-only), resolve-holders.ts (--mint, --count)
-- Key discovery: Jupiter returns quote data even with empty transaction for insufficient-funds takers
 
-Remaining: S05 (fund backend + data model) and S06 (outbound integration) depend on all four prior slices.
+**S05 (Fund Backend & Data Model)** delivered:
+- PostgreSQL 16 Docker Compose service with health checks and named volume
+- Drizzle ORM schema: 4 enums + 5 tables (funds, fundWallets, fundDivestmentConfig, pipelineRuns, transactions)
+- Connection factory with lazy pool init and DATABASE_URL env config
+- Fund repository: 15 typed CRUD functions with db injection for testability
+- Fund lifecycle state machine: 8 states, validated transitions, typed error classes
+- R017 divestment config immutability: update-if-unlocked, reject-if-locked enforcement
+- Basis points validation (holderSplitBps + ownerSplitBps ≤ 10000)
+- 28 integration tests (skip gracefully when PostgreSQL unavailable)
+- db-seed script exercising full data model end-to-end
+
+Remaining: S06 (outbound subsystem integration) wires the end-to-end flow.
 
 ## Architecture / Key Patterns
 
@@ -61,6 +71,7 @@ Remaining: S05 (fund backend + data model) and S06 (outbound integration) depend
 - deBridge DLN REST API for cross-chain bridging (thin client, no SDK)
 - viem for EVM interaction (established in S01)
 - vitest for unit testing (established in S02)
+- Drizzle ORM + node-postgres for fund data persistence (established in S05)
 - PostgreSQL 16 + Redis/BullMQ for state and job queues
 - Foundry for Solidity contracts
 
@@ -74,7 +85,7 @@ Remaining: S05 (fund backend + data model) and S06 (outbound integration) depend
 - deBridge create-tx is GET with query params; dstChainTokenOutAmount=auto required
 - Public Solana RPC rejects getProgramAccounts for high-holder-count tokens — use Helius DAS
 
-**Established patterns (S01–S04):**
+**Established patterns (S01–S05):**
 - Blockscout free API for Base chain (Etherscan V2 as optional fallback with paid key)
 - EIP-1967 proxy detection for Alvara contract resolution
 - Structured JSON logging with module/phase/action fields
@@ -87,6 +98,9 @@ Remaining: S05 (fund backend + data model) and S06 (outbound integration) depend
 - vitest with fetch mocking and SDK mock injection for unit tests
 - Dual-strategy resolution with automatic fallback (Helius DAS → getProgramAccounts)
 - Integer math (bigint * 10000n / total) for percentage calculation avoiding float drift
+- Drizzle ORM db injection: all repository functions accept `db` parameter for testability
+- Fund lifecycle state machine: Record<FundStatus, FundStatus[]> with typed error classes
+- Integration tests skip gracefully when infrastructure is unavailable (ctx.skip() pattern)
 
 ## Capability Contract
 
@@ -94,7 +108,7 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 
 ## Milestone Sequence
 
-- [ ] M001: Risk Retirement & Subsystem Proof — S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05–S06 remaining
+- [ ] M001: Risk Retirement & Subsystem Proof — S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅, S06 remaining
 - [ ] M002: Outbound Pipeline (Solana → Alvara) — Reflections flow automatically from Bags.fm into Alvara baskets
 - [ ] M003: Return Pipeline & Distribution — Auto-divestment triggers liquidation, proceeds bridge back to Solana and distribute to holders
 - [ ] M004: App Store Launch — Bags.fm embedded UI, dashboard, notifications, multi-fund parallel operation

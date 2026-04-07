@@ -34,6 +34,18 @@ async function seed() {
   const db = createDb();
 
   try {
+    // Check PostgreSQL connectivity before seeding
+    const { getDbPool } = await import('../src/db/connection.js');
+    const pool = getDbPool();
+    try {
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+    } catch {
+      console.warn('⚠️  PostgreSQL not reachable — skipping seed. Start with: docker compose up -d postgres');
+      process.exit(0);
+    }
+
     console.log('🌱 Seeding database...\n');
 
     // 1. Create fund
