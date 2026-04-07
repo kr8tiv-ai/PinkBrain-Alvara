@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T19:04:03.490Z",
+  "exported_at": "2026-04-07T19:08:08.216Z",
   "milestones": [
     {
       "id": "M001",
@@ -1624,19 +1624,25 @@
       "milestone_id": "M002",
       "slice_id": "S03",
       "id": "T03",
-      "title": "Build CLI scripts for rebalance and emergency controls",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built rebalance-bskt.ts and emergency-stables.ts CLI scripts with arg validation, snapshot file I/O, and structured JSON output — 80 tests pass",
+      "status": "complete",
+      "one_liner": "Built rebalance-bskt.ts and emergency-stables.ts CLI scripts with arg validation, snapshot file I/O, and structured JSON output — 80 tests pass",
+      "narrative": "Created two CLI scripts wiring rebalance (T01) and emergency (T02) modules to command-line usage. rebalance-bskt.ts accepts --bskt-address, --new-tokens, --new-weights, --mode, --dry-run with full validation (address format, token/weight count match, weights sum to 10000). emergency-stables.ts supports two modes: default converts to 95% USDT + 5% ALVA and outputs snapshot JSON; --revert --snapshot-file reads the snapshot back and restores original composition. Both follow the established contribute-bskt.ts pattern with manual argv parsing, PRIVATE_KEY validation, ALVARA_API_URL override, structured JSON to stdout, and diagnostic logs to stderr.",
+      "verification_result": "Both scripts produce clean --help output. Full test suite (80 tests across 4 files: alvara-rebalance, alvara-emergency, alvara-contribute, alvara-api) passes with zero regressions.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T19:08:08.148Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "scripts/rebalance-bskt.ts",
+        "scripts/emergency-stables.ts"
+      ],
+      "key_decisions": [
+        "amountIn defaults to array of '0' strings — backend computes actual swap amounts",
+        "Snapshot uses string-encoded weights for bigint JSON safety"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S03\nmilestone: M002\nkey_files:\n  - scripts/rebalance-bskt.ts\n  - scripts/emergency-stables.ts\nkey_decisions:\n  - amountIn defaults to array of '0' strings — backend computes actual swap amounts\n  - Snapshot uses string-encoded weights for bigint JSON safety\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T19:08:08.147Z\nblocker_discovered: false\n---\n\n# T03: Built rebalance-bskt.ts and emergency-stables.ts CLI scripts with arg validation, snapshot file I/O, and structured JSON output — 80 tests pass\n\n**Built rebalance-bskt.ts and emergency-stables.ts CLI scripts with arg validation, snapshot file I/O, and structured JSON output — 80 tests pass**\n\n## What Happened\n\nCreated two CLI scripts wiring rebalance (T01) and emergency (T02) modules to command-line usage. rebalance-bskt.ts accepts --bskt-address, --new-tokens, --new-weights, --mode, --dry-run with full validation (address format, token/weight count match, weights sum to 10000). emergency-stables.ts supports two modes: default converts to 95% USDT + 5% ALVA and outputs snapshot JSON; --revert --snapshot-file reads the snapshot back and restores original composition. Both follow the established contribute-bskt.ts pattern with manual argv parsing, PRIVATE_KEY validation, ALVARA_API_URL override, structured JSON to stdout, and diagnostic logs to stderr.\n\n## Verification\n\nBoth scripts produce clean --help output. Full test suite (80 tests across 4 files: alvara-rebalance, alvara-emergency, alvara-contribute, alvara-api) passes with zero regressions.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx tsx scripts/rebalance-bskt.ts --help` | 0 | ✅ pass | 28300ms |\n| 2 | `npx tsx scripts/emergency-stables.ts --help` | 0 | ✅ pass | 25700ms |\n| 3 | `npx vitest run tests/alvara-rebalance.test.ts tests/alvara-emergency.test.ts tests/alvara-contribute.test.ts tests/alvara-api.test.ts` | 0 | ✅ pass | 26500ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `scripts/rebalance-bskt.ts`\n- `scripts/emergency-stables.ts`\n",
       "description": "Build two CLI scripts following the contribute-bskt.ts pattern (arg parsing, PRIVATE_KEY validation, structured JSON output to stdout, logs to stderr).\n\n1. **scripts/rebalance-bskt.ts** — manual rebalance:\n   - Args: --bskt-address (required), --new-tokens (comma-separated addresses), --new-weights (comma-separated bps), --mode (default 0), --dry-run\n   - Validates: address format, tokens/weights same length, weights sum to 10000\n   - Calls rebalanceBSKT() from src/alvara/rebalance.ts\n   - Outputs: JSON with success, txHash, oldTokens, oldWeights, newTokens, newWeights, gasUsed, event data\n\n2. **scripts/emergency-stables.ts** — emergency stables + revert:\n   - Args: --bskt-address (required), --revert (optional, with --snapshot-file for composition JSON), --dry-run\n   - Default mode (no --revert): calls emergencyStables(), prints result + snapshot JSON\n   - Revert mode (--revert --snapshot-file path): reads snapshot JSON from file, calls emergencyRevert()\n   - Outputs: JSON with success, txHash, snapshot (when converting), gasUsed\n\nBoth scripts:\n- Use parseArgs pattern from contribute-bskt.ts (manual argv parsing)\n- Create publicClient via createBaseClient(), walletClient via privateKeyToAccount + createWalletClient\n- Print structured JSON result to stdout\n- Print diagnostic logs to stderr\n- Validate PRIVATE_KEY format (0x-prefixed 64 hex chars)\n- Support ALVARA_API_URL env var override\n\nThen run the full test suite to confirm no regressions.",
       "estimate": "45m",
       "files": [
@@ -2719,6 +2725,39 @@
       "verdict": "✅ pass",
       "duration_ms": 15920,
       "created_at": "2026-04-07T19:04:03.405Z"
+    },
+    {
+      "id": 60,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M002",
+      "command": "npx tsx scripts/rebalance-bskt.ts --help",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 28300,
+      "created_at": "2026-04-07T19:08:08.148Z"
+    },
+    {
+      "id": 61,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M002",
+      "command": "npx tsx scripts/emergency-stables.ts --help",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 25700,
+      "created_at": "2026-04-07T19:08:08.148Z"
+    },
+    {
+      "id": 62,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M002",
+      "command": "npx vitest run tests/alvara-rebalance.test.ts tests/alvara-emergency.test.ts tests/alvara-contribute.test.ts tests/alvara-api.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 26500,
+      "created_at": "2026-04-07T19:08:08.148Z"
     }
   ]
 }
