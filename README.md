@@ -74,19 +74,19 @@ This powers the **Bags Store integration** — enabling $KR8TIV holders to creat
 
 ## Bags Store Integration
 
-PinkBrain Alvara is designed to plug into the **Bags.fm store** as a basket creation and management tool for $KR8TIV token holders:
+PinkBrain Alvara is designed to plug into the **Bags.fm store** as a basket creation and management tool for $BRAIN token holders:
 
 | Integration Point | Description |
 |---|---|
 | **Basket Discovery** | Browse existing BSKTs on Base via the factory index |
 | **One-Click Creation** | Create diversified baskets with configurable token weights |
 | **Compliance Verification** | Verify any BSKT meets ERC-7621 spec before listing |
-| **Fee Sharing** | Revenue from BSKT operations flows back to $KR8TIV holders via Bags.fm |
+| **Fee Sharing** | Revenue from BSKT operations flows back to $BRAIN holders via Bags.fm |
 | **Portfolio Tracking** | Read constituent tokens, weights, reserves, and total basket value on-chain |
 
-### $KR8TIV Ecosystem
+### Pinky and the Brain Ecosystem
 
-Part of the **kr8tiv-ai** product suite powered by the **$KR8TIV** token on Solana through Bags.fm fee-sharing infrastructure.
+Part of the **Pinky and the Brain** product suite powered by the **$BRAIN** token on Solana through Bags.fm fee-sharing infrastructure.
 
 ---
 
@@ -220,15 +220,15 @@ The verifier produces a structured JSON report:
 
 ---
 
-## The kr8tiv-ai Ecosystem
+## The Pinky and the Brain Ecosystem
+
+All **PinkBrain** products are powered by the **$BRAIN** token on Solana through Bags.fm fee-sharing infrastructure.
 
 | Project | Description |
 |---------|-------------|
-| **[KIN](https://github.com/kr8tiv-ai/Kin)** | AI companion platform — 57 3D characters, 6 bloodlines |
 | **[PinkBrain Router](https://github.com/kr8tiv-ai/PinkBrain-Router)** | Bags.fm fee-funded OpenRouter API credits for 300+ AI models |
 | **[PinkBrain LP](https://github.com/kr8tiv-ai/PinkBrain-lp)** | Auto-compounding Meteora DAMM v2 liquidity |
 | **[PinkBrain Alvara](https://github.com/kr8tiv-ai/PinkBrain-Alvara)** | ERC-7621 basket token infrastructure (this repo) |
-| **[Runtime Truth Contracts](https://github.com/kr8tiv-ai/kr8tiv-runtime-truth-contracts)** | Schema-first runtime contracts |
 
 ---
 
