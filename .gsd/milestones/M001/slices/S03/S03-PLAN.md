@@ -115,7 +115,7 @@
   - Estimate: 1h30m
   - Files: src/bags/fee-share.ts, src/bags/fee-claim.ts, tests/bags-fee-share.test.ts
   - Verify: npx vitest run tests/bags-fee-share.test.ts && npx vitest run
-- [ ] **T03: Build end-to-end CLI proof script for fee share and claiming** — Create the CLI script that proves the slice demo: query admin status, update fee share config, query claimable positions, and claim fees. Supports --dry-run mode for testing without a live API key. Update .env.example with BAGS_API_KEY.
+- [x] **T03: Created scripts/bags-fee-share.ts CLI proof with 6 mock response shapes in dry-run mode, env validation in live mode, and structured JSON output throughout** — Create the CLI script that proves the slice demo: query admin status, update fee share config, query claimable positions, and claim fees. Supports --dry-run mode for testing without a live API key. Update .env.example with BAGS_API_KEY.
 
 ## Steps
 

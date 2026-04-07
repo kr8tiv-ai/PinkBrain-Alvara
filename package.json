@@ -10,7 +10,8 @@
     "test": "vitest run",
     "bridge": "tsx scripts/bridge-sol-to-base.ts",
     "bridge-estimate": "tsx scripts/bridge-sol-to-base.ts --estimate-only",
-    "bridge-status": "tsx scripts/check-bridge-status.ts"
+    "bridge-status": "tsx scripts/check-bridge-status.ts",
+    "bags-fee-share": "tsx scripts/bags-fee-share.ts"
   },
   "dependencies": {
     "@bagsfm/bags-sdk": "^1.3.5",

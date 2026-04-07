@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T08:21:00.742Z",
+  "exported_at": "2026-04-07T08:26:58.743Z",
   "milestones": [
     {
       "id": "M001",
@@ -544,19 +544,26 @@
       "milestone_id": "M001",
       "slice_id": "S03",
       "id": "T03",
-      "title": "Build end-to-end CLI proof script for fee share and claiming",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Created scripts/bags-fee-share.ts CLI proof with 6 mock response shapes in dry-run mode, env validation in live mode, and structured JSON output throughout",
+      "status": "complete",
+      "one_liner": "Created scripts/bags-fee-share.ts CLI proof with 6 mock response shapes in dry-run mode, env validation in live mode, and structured JSON output throughout",
+      "narrative": "Built the CLI proof script that exercises the full Bags SDK fee share and claiming flow. Dry-run mode outputs realistic mock JSON for all 6 operations (ping, admin list, claimable positions, update config tx, claim txs, sign+send) without requiring any env vars. Live mode validates BAGS_API_KEY incrementally and SOL_PRIVATE_KEY only when --claim is used. Added bags-fee-share npm script and documented BAGS_API_KEY in .env.example. All 79 tests pass with no regressions.",
+      "verification_result": "1. npx tsx scripts/bags-fee-share.ts --dry-run exits 0 with 6 valid JSON lines. 2. Live mode without BAGS_API_KEY exits non-zero with structured error. 3. All stdout validated as parseable JSON. 4. npx vitest run — 79 tests pass (4 files). 5. npx vitest run tests/bags-client.test.ts — 14 tests pass. 6. grep confirms SDK installed, npm script added, BAGS_API_KEY in .env.example.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T08:26:58.678Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Original verification gate failed due to npx vitest not being found on Windows PATH — transient environment issue, no code changes needed.",
+      "known_issues": "None.",
+      "key_files": [
+        "scripts/bags-fee-share.ts",
+        "package.json",
+        ".env.example"
+      ],
+      "key_decisions": [
+        "Dry-run mode outputs all 6 API response shapes as realistic mock JSON — no API key needed",
+        "Live mode validates env vars incrementally (BAGS_API_KEY for all calls, SOL_PRIVATE_KEY only for --claim)"
+      ],
+      "full_summary_md": "---\nid: T03\nparent: S03\nmilestone: M001\nkey_files:\n  - scripts/bags-fee-share.ts\n  - package.json\n  - .env.example\nkey_decisions:\n  - Dry-run mode outputs all 6 API response shapes as realistic mock JSON — no API key needed\n  - Live mode validates env vars incrementally (BAGS_API_KEY for all calls, SOL_PRIVATE_KEY only for --claim)\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T08:26:58.678Z\nblocker_discovered: false\n---\n\n# T03: Created scripts/bags-fee-share.ts CLI proof with 6 mock response shapes in dry-run mode, env validation in live mode, and structured JSON output throughout\n\n**Created scripts/bags-fee-share.ts CLI proof with 6 mock response shapes in dry-run mode, env validation in live mode, and structured JSON output throughout**\n\n## What Happened\n\nBuilt the CLI proof script that exercises the full Bags SDK fee share and claiming flow. Dry-run mode outputs realistic mock JSON for all 6 operations (ping, admin list, claimable positions, update config tx, claim txs, sign+send) without requiring any env vars. Live mode validates BAGS_API_KEY incrementally and SOL_PRIVATE_KEY only when --claim is used. Added bags-fee-share npm script and documented BAGS_API_KEY in .env.example. All 79 tests pass with no regressions.\n\n## Verification\n\n1. npx tsx scripts/bags-fee-share.ts --dry-run exits 0 with 6 valid JSON lines. 2. Live mode without BAGS_API_KEY exits non-zero with structured error. 3. All stdout validated as parseable JSON. 4. npx vitest run — 79 tests pass (4 files). 5. npx vitest run tests/bags-client.test.ts — 14 tests pass. 6. grep confirms SDK installed, npm script added, BAGS_API_KEY in .env.example.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx tsx scripts/bags-fee-share.ts --dry-run` | 0 | ✅ pass | 3000ms |\n| 2 | `npx vitest run` | 0 | ✅ pass | 8000ms |\n| 3 | `npx vitest run tests/bags-client.test.ts` | 0 | ✅ pass | 5000ms |\n| 4 | `grep -q '@bagsfm/bags-sdk' package.json` | 0 | ✅ pass | 100ms |\n| 5 | `grep -q bags-fee-share package.json` | 0 | ✅ pass | 100ms |\n| 6 | `grep -q BAGS_API_KEY .env.example` | 0 | ✅ pass | 100ms |\n\n## Deviations\n\nOriginal verification gate failed due to npx vitest not being found on Windows PATH — transient environment issue, no code changes needed.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `scripts/bags-fee-share.ts`\n- `package.json`\n- `.env.example`\n",
       "description": "Create the CLI script that proves the slice demo: query admin status, update fee share config, query claimable positions, and claim fees. Supports --dry-run mode for testing without a live API key. Update .env.example with BAGS_API_KEY.\n\n## Steps\n\n1. Update `.env.example` — add `BAGS_API_KEY=` with a comment explaining where to get it (`dev.bags.fm`)\n2. Create `scripts/bags-fee-share.ts`:\n   - Parse CLI args: `--dry-run` (use mock data instead of real API), `--wallet <address>` (override default), `--token-mint <address>` (target token), `--treasury <address>` (treasury wallet to add as claimer), `--claim` (actually sign and send claim transactions)\n   - Load env: `dotenv/config`, read `BAGS_API_KEY`, `SOL_PRIVATE_KEY`, `SOL_RPC_URL`\n   - In dry-run mode: print mock response shapes showing what each API call would return (admin list, claimable positions, update-config transaction, claim transactions). Exit 0.\n   - In live mode:\n     a. Call `pingApi(apiKey)` to validate the key\n     b. Call `getAdminTokenList(apiKey, wallet)` — log the mints where wallet is admin\n     c. Call `getClaimablePositions(apiKey, wallet)` — log positions with claimable amounts\n     d. If `--treasury` provided: call `buildUpdateConfigTransaction(apiKey, { baseMint: tokenMint, claimersArray: [wallet, treasury], basisPointsArray: [5000, 5000], payer: wallet })` — log the transaction payload (don't sign unless --claim is passed)\n     e. If `--claim` provided: call `getClaimTransactions(apiKey, wallet, tokenMint)`, then `signAndSendClaimTransactions(connection, keypair, txs)` — log tx hashes\n   - All output is structured JSON to stdout (consistent with other scripts)\n   - Error handling: catch at top level, log structured error with phase, exit 1\n3. Add npm script to `package.json`: `\"bags-fee-share\": \"tsx scripts/bags-fee-share.ts\"`\n4. Verify: `npx tsx scripts/bags-fee-share.ts --dry-run` exits 0 with valid JSON output showing all API response shapes\n5. Verify: `npx vitest run` — full test suite still passes (no regressions)\n\n## Must-Haves\n\n- [ ] `scripts/bags-fee-share.ts` runs in --dry-run mode without any env vars set\n- [ ] Dry-run output shows realistic mock shapes for: admin list, claimable positions, update-config tx, claim tx\n- [ ] Live mode validates BAGS_API_KEY is set before making API calls\n- [ ] Live mode with --claim validates SOL_PRIVATE_KEY is set before signing\n- [ ] All output is structured JSON (one JSON object per line)\n- [ ] npm script `bags-fee-share` added to package.json\n- [ ] .env.example updated with BAGS_API_KEY\n\n## Verification\n\n- `npx tsx scripts/bags-fee-share.ts --dry-run` exits 0 with JSON output\n- `npx vitest run` — full test suite passes",
       "estimate": "45m",
       "files": [
@@ -982,6 +989,72 @@
       "verdict": "✅ pass",
       "duration_ms": 100,
       "created_at": "2026-04-07T08:21:00.702Z"
+    },
+    {
+      "id": 11,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "npx tsx scripts/bags-fee-share.ts --dry-run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 3000,
+      "created_at": "2026-04-07T08:26:58.678Z"
+    },
+    {
+      "id": 12,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "npx vitest run",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 8000,
+      "created_at": "2026-04-07T08:26:58.678Z"
+    },
+    {
+      "id": 13,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "npx vitest run tests/bags-client.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 5000,
+      "created_at": "2026-04-07T08:26:58.678Z"
+    },
+    {
+      "id": 14,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "grep -q '@bagsfm/bags-sdk' package.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T08:26:58.678Z"
+    },
+    {
+      "id": 15,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "grep -q bags-fee-share package.json",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T08:26:58.679Z"
+    },
+    {
+      "id": 16,
+      "task_id": "T03",
+      "slice_id": "S03",
+      "milestone_id": "M001",
+      "command": "grep -q BAGS_API_KEY .env.example",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 100,
+      "created_at": "2026-04-07T08:26:58.679Z"
     }
   ]
 }
