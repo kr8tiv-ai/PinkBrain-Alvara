@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-04-07T20:25:40.971Z",
+  "exported_at": "2026-04-07T20:35:35.536Z",
   "milestones": [
     {
       "id": "M001",
@@ -2137,19 +2137,28 @@
       "milestone_id": "M003",
       "slice_id": "S01",
       "id": "T02",
-      "title": "Build EVM bridge submission helper and inbound pipeline orchestrator with tests",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Built EVM bridge submission helper and 3-phase inbound pipeline orchestrator (redeem → swap → bridge) with checkpoint recovery and 20 tests",
+      "status": "complete",
+      "one_liner": "Built EVM bridge submission helper and 3-phase inbound pipeline orchestrator (redeem → swap → bridge) with checkpoint recovery and 20 tests",
+      "narrative": "Created src/debridge/evm-tx.ts with submitEvmBridgeTransaction() that handles ERC-20 USDC approval to DlnSource + bridge tx submission from deBridge's create-tx response. Extended src/pipeline/types.ts with inbound pipeline types. Created src/pipeline/inbound.ts with runInboundPipeline() orchestrating 3 phases (redeeming BSKT→ETH, swapping ETH→USDC, bridging USDC Base→Solana) with advisory checkpoint writes, fund validation, DB transaction recording, and resumeInboundPipeline() for crash recovery. Used 'divesting' DB phase enum for the first phase since 'redeeming' is not in the pipeline_phase enum. 5 EVM bridge tests and 15 inbound pipeline tests all pass.",
+      "verification_result": "Ran npx vitest run tests/debridge-evm-tx.test.ts tests/inbound-pipeline.test.ts — 20/20 tests passed. Ran npx tsc --noEmit — zero errors in new source files.",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-04-07T20:35:35.503Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "Used 'divesting' as the DB pipeline_phase since 'redeeming' is not in the pipeline_phase enum. Checkpoint keys remain semantic.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/debridge/evm-tx.ts",
+        "src/pipeline/inbound.ts",
+        "src/pipeline/types.ts",
+        "tests/debridge-evm-tx.test.ts",
+        "tests/inbound-pipeline.test.ts"
+      ],
+      "key_decisions": [
+        "Used 'divesting' DB phase enum for inbound first phase since 'redeeming' not in pipeline_phase enum",
+        "Inbound pipeline accepts both 'active' and 'divesting' fund statuses"
+      ],
+      "full_summary_md": "---\nid: T02\nparent: S01\nmilestone: M003\nkey_files:\n  - src/debridge/evm-tx.ts\n  - src/pipeline/inbound.ts\n  - src/pipeline/types.ts\n  - tests/debridge-evm-tx.test.ts\n  - tests/inbound-pipeline.test.ts\nkey_decisions:\n  - Used 'divesting' DB phase enum for inbound first phase since 'redeeming' not in pipeline_phase enum\n  - Inbound pipeline accepts both 'active' and 'divesting' fund statuses\nduration: \nverification_result: passed\ncompleted_at: 2026-04-07T20:35:35.501Z\nblocker_discovered: false\n---\n\n# T02: Built EVM bridge submission helper and 3-phase inbound pipeline orchestrator (redeem → swap → bridge) with checkpoint recovery and 20 tests\n\n**Built EVM bridge submission helper and 3-phase inbound pipeline orchestrator (redeem → swap → bridge) with checkpoint recovery and 20 tests**\n\n## What Happened\n\nCreated src/debridge/evm-tx.ts with submitEvmBridgeTransaction() that handles ERC-20 USDC approval to DlnSource + bridge tx submission from deBridge's create-tx response. Extended src/pipeline/types.ts with inbound pipeline types. Created src/pipeline/inbound.ts with runInboundPipeline() orchestrating 3 phases (redeeming BSKT→ETH, swapping ETH→USDC, bridging USDC Base→Solana) with advisory checkpoint writes, fund validation, DB transaction recording, and resumeInboundPipeline() for crash recovery. Used 'divesting' DB phase enum for the first phase since 'redeeming' is not in the pipeline_phase enum. 5 EVM bridge tests and 15 inbound pipeline tests all pass.\n\n## Verification\n\nRan npx vitest run tests/debridge-evm-tx.test.ts tests/inbound-pipeline.test.ts — 20/20 tests passed. Ran npx tsc --noEmit — zero errors in new source files.\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run tests/debridge-evm-tx.test.ts tests/inbound-pipeline.test.ts` | 0 | ✅ pass | 12130ms |\n| 2 | `npx tsc --noEmit (new files only)` | 0 | ✅ pass | 42500ms |\n\n## Deviations\n\nUsed 'divesting' as the DB pipeline_phase since 'redeeming' is not in the pipeline_phase enum. Checkpoint keys remain semantic.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/debridge/evm-tx.ts`\n- `src/pipeline/inbound.ts`\n- `src/pipeline/types.ts`\n- `tests/debridge-evm-tx.test.ts`\n- `tests/inbound-pipeline.test.ts`\n",
       "description": "Create (1) `src/debridge/evm-tx.ts` — submits EVM calldata from deBridge's create-tx response as an on-chain transaction via viem (ERC-20 USDC approval to DlnSource + walletClient.sendTransaction). (2) Extend `src/pipeline/types.ts` with inbound pipeline types. (3) Create `src/pipeline/inbound.ts` — 3-phase orchestrator (redeem → ETH→USDC swap → bridge to Solana) with checkpoint recovery following the exact outbound pipeline pattern.\n\n## Steps\n\n1. Read `src/debridge/solana-tx.ts` for the Solana-side bridge tx submission pattern, and `src/pipeline/outbound.ts` for checkpoint recovery, logging, and phase orchestration patterns.\n2. Create `src/debridge/evm-tx.ts`:\n   - Export `submitEvmBridgeTransaction(opts): Promise<{ txHash: string }>` \n   - Options: publicClient, walletClient, txData (from DeBridgeOrderResponse.tx — has .data, .to, .value), usdcAmount (for approval)\n   - Flow: check USDC allowance to tx.to (DlnSource) → approve if insufficient → send transaction (to: tx.to, data: tx.data, value: BigInt(tx.value)) → wait receipt → verify not reverted → return txHash\n   - Reuse the checkAllowance/approveUsdc pattern from `src/evm/swap.ts`\n3. Extend `src/pipeline/types.ts`:\n   - Add `InboundCheckpointPhaseData` interface (redeeming, swapping, bridging phases)\n   - Add `InboundPipelineOptions` interface (fundId, db, evmPublicClient, evmWalletClient, solanaRecipientAddress, bsktAddress, bsktPairAddress optional, pipelineRunId, resumeCheckpoint)\n   - Add `InboundPipelineResult` interface (pipelineRunId, txHashes: InboundTxHashes, amountRedeemed, amountSwapped, amountBridged, durationMs)\n   - Add `InboundTxHashes` interface (redeemTx, swapTx, bridgeSendTx, bridgeReceiveTx)\n4. Create `src/pipeline/inbound.ts`:\n   - Export `runInboundPipeline(opts: InboundPipelineOptions): Promise<InboundPipelineResult>`\n   - Phase 1 (redeeming): call redeemBSKTForETH → checkpoint with ETH received\n   - Phase 2 (swapping): call swapEthToUsdc with ETH from phase 1 → checkpoint with USDC amount\n   - Phase 3 (bridging): call createBridgeOrder (srcChainId=BASE, dstChainId=SOLANA, USDC→USDC) → submitEvmBridgeTransaction → waitForFulfillment → checkpoint\n   - Each phase: check if already in checkpoint → skip if completed → execute → write advisory checkpoint → update pipeline_runs phase\n   - On any error: persist to pipeline_runs.error, set status='failed', re-throw\n   - Export `resumeInboundPipeline()` following the outbound resume pattern\n   - Reuse parseCheckpoint from outbound.ts (or extract shared version)\n5. Create `tests/debridge-evm-tx.test.ts`:\n   - Mock viem publicClient.readContract (allowance), walletClient.sendTransaction, publicClient.waitForTransactionReceipt\n   - Test happy path: approval needed → approved → tx sent → confirmed\n   - Test approval skip: allowance already sufficient\n   - Test tx revert handling\n6. Create `tests/inbound-pipeline.test.ts`:\n   - Mock all subsystems: redeemBSKTForETH, swapEthToUsdc, createBridgeOrder, submitEvmBridgeTransaction, waitForFulfillment, DB functions\n   - Test happy path: all 3 phases complete, tx hashes collected, pipeline_runs updated\n   - Test checkpoint resume: skip completed phases, resume from last failure\n   - Test phase failure: error persisted to DB, status set to 'failed'\n   - Test fund validation: fund not found → error, wrong status → error\n7. Run tests and tsc --noEmit.\n\n## Must-Haves\n\n- [ ] `submitEvmBridgeTransaction()` handles ERC-20 USDC approval to DlnSource before submitting\n- [ ] `submitEvmBridgeTransaction()` sends tx with correct to/data/value from deBridge response\n- [ ] Inbound pipeline orchestrates 3 phases: redeem → swap → bridge\n- [ ] Each phase writes advisory checkpoint to pipeline_runs.metadata\n- [ ] Pipeline supports resume from any failed phase via checkpoint\n- [ ] Pipeline records transactions in DB (bskt_redeem, swap, bridge_send, bridge_receive operations)\n- [ ] Pipeline validates fund exists and has correct status before proceeding\n- [ ] All tests pass\n\n## Failure Modes\n\n| Dependency | On error | On timeout | On malformed response |\n|------------|----------|-----------|----------------------|\n| redeemBSKTForETH | Error propagated, pipeline marked failed at 'redeeming' | 60s receipt timeout propagated | N/A (typed return) |\n| swapEthToUsdc | Error propagated, pipeline marked failed at 'swapping' | 1inch/receipt timeout propagated | Error with invalid response message |\n| createBridgeOrder | Error propagated, pipeline marked failed at 'bridging' | 15s DLN timeout | Error with missing tx.data |\n| submitEvmBridgeTransaction | Error propagated with tx context | 60s receipt timeout | N/A |\n| waitForFulfillment | Error after 60 attempts (5min), pipeline marked failed | Throws with attempt count | N/A |\n| DB (checkpoint write) | Advisory — logged but pipeline continues (K018) | Advisory | Advisory |",
       "estimate": "2.5h",
       "files": [
@@ -3561,6 +3570,28 @@
       "verdict": "✅ pass",
       "duration_ms": 37900,
       "created_at": "2026-04-07T20:25:40.934Z"
+    },
+    {
+      "id": 79,
+      "task_id": "T02",
+      "slice_id": "S01",
+      "milestone_id": "M003",
+      "command": "npx vitest run tests/debridge-evm-tx.test.ts tests/inbound-pipeline.test.ts",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 12130,
+      "created_at": "2026-04-07T20:35:35.503Z"
+    },
+    {
+      "id": 80,
+      "task_id": "T02",
+      "slice_id": "S01",
+      "milestone_id": "M003",
+      "command": "npx tsc --noEmit (new files only)",
+      "exit_code": 0,
+      "verdict": "✅ pass",
+      "duration_ms": 42500,
+      "created_at": "2026-04-07T20:35:35.503Z"
     }
   ]
 }

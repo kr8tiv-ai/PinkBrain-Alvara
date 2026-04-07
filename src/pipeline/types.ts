@@ -100,6 +100,80 @@ export interface PipelineTxHashes {
   investTxHash: string | null;
 }
 
+// ── Inbound pipeline types ──────────────────────────────────────────────
+
+/** Per-phase output data stored in the inbound checkpoint. */
+export interface InboundCheckpointPhaseData {
+  redeeming?: {
+    txHash: string;
+    ethReceived: string;
+  };
+  swapping?: {
+    txHash: string;
+    usdcReceived: string;
+  };
+  bridging?: {
+    orderId: string;
+    bridgeSendTxHash: string;
+    bridgeReceiveTxHash: string | null;
+    bridgeAmount: string;
+  };
+}
+
+/** Checkpoint persisted in pipeline_runs.metadata for inbound crash recovery. */
+export interface InboundPipelineCheckpoint {
+  completedPhases: string[];
+  phaseData: InboundCheckpointPhaseData;
+}
+
+/** Everything the inbound pipeline needs to run. Dependency-injected. */
+export interface InboundPipelineOptions {
+  /** Fund UUID in the database */
+  fundId: string;
+  /** Drizzle database instance */
+  db: AppDb;
+  /** Viem PublicClient for Base reads */
+  evmPublicClient: AnyPublicClient;
+  /** Viem WalletClient for Base signing */
+  evmWalletClient: AnyWalletClient;
+  /** Recipient address on Solana for the bridge */
+  solanaRecipientAddress: string;
+  /** BSKT NFT contract address on Base */
+  bsktAddress: Address;
+  /** BSKTPair address (optional — redeem reads from BSKT if not given) */
+  bsktPairAddress?: Address;
+  /** Existing pipeline run ID to resume */
+  pipelineRunId?: string;
+  /** Checkpoint from a previous partial run — listed phases are skipped */
+  resumeCheckpoint?: InboundPipelineCheckpoint;
+}
+
+/** Per-phase transaction hashes collected during the inbound pipeline. */
+export interface InboundTxHashes {
+  redeemTx: string | null;
+  swapTx: string | null;
+  bridgeSendTx: string | null;
+  bridgeReceiveTx: string | null;
+}
+
+/** Result returned on successful inbound pipeline completion. */
+export interface InboundPipelineResult {
+  /** Database ID of the pipeline_runs row */
+  pipelineRunId: string;
+  /** Transaction hashes keyed by phase */
+  txHashes: InboundTxHashes;
+  /** ETH received from BSKT redemption (wei as string) */
+  amountRedeemed: string;
+  /** USDC received from ETH→USDC swap (atomic units as string) */
+  amountSwapped: string;
+  /** USDC amount sent to bridge (atomic units as string) */
+  amountBridged: string;
+  /** Wall-clock duration of the entire pipeline (ms) */
+  durationMs: number;
+}
+
+// ── Outbound result ─────────────────────────────────────────────────────
+
 /** Result returned on successful pipeline completion. */
 export interface OutboundPipelineResult {
   /** Database ID of the pipeline_runs row */
