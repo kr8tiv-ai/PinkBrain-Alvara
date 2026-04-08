@@ -1,115 +1,177 @@
-<div align="center">
+```
+ ____  _       _    ____            _            _    _
+|  _ \(_)_ __ | | _| __ ) _ __ __ _(_)_ __      / \  | |_   ____ _ _ __ __ _
+| |_) | | '_ \| |/ /  _ \| '__/ _` | | '_ \   / _ \ | \ \ / / _` | '__/ _` |
+|  __/| | | | |   <| |_) | | | (_| | | | | | / ___ \| |\ V / (_| | | | (_| |
+|_|   |_|_| |_|_|\_\____/|_|  \__,_|_|_| |_|/_/   \_\_| \_/ \__,_|_|  \__,_|
+```
 
 # PinkBrain Alvara
 
-### *On-Chain Basket Token Infrastructure for Bags.fm*
-
-<img src="https://img.shields.io/badge/BAGS_STORE-INTEGRATION-FF00AA?style=for-the-badge&labelColor=1a1a2e" alt="Bags Store" />
-<img src="https://img.shields.io/badge/BASE_MAINNET-LIVE-0052FF?style=for-the-badge&labelColor=1a1a2e&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSI4IiBmaWxsPSIjMDA1MkZGIi8+PC9zdmc+" alt="Base Mainnet" />
-<img src="https://img.shields.io/badge/ERC--7621-BSKT_PROTOCOL-9945FF?style=for-the-badge&labelColor=1a1a2e" alt="ERC-7621" />
-
-<br /><br />
-
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![Viem](https://img.shields.io/badge/Viem-2.23-1C1C1C?style=flat-square)](https://viem.sh)
-[![Base](https://img.shields.io/badge/Chain-Base_(8453)-0052FF?style=flat-square)](https://base.org)
-[![License](https://img.shields.io/badge/License-MIT-00F0FF?style=flat-square)](LICENSE)
+**Cross-chain basket token infrastructure for the $BRAIN ecosystem.**
+ERC-7621 BSKT index funds on Base, powered by Bags.fm fee sharing on Solana.
 
 ---
 
-**Programmatic BSKT (Basket Token) creation and verification on Base**
-**via Alvara's ERC-7621 factory contracts.**
-
-[Bags Store](https://bags.fm) | [Alvara Protocol](https://alvara.xyz) | [ERC-7621 Spec](https://eips.ethereum.org/EIPS/eip-7621) | [kr8tiv-ai](https://github.com/kr8tiv-ai)
-
-</div>
+`ERC-7621` | `Base Mainnet` | `TypeScript` | `Alvara Protocol` | `Bags.fm Integration` | `v0.1.0`
 
 ---
 
-## What is PinkBrain Alvara?
+## The Plan
 
-PinkBrain Alvara is the **on-chain basket token engine** for the kr8tiv-ai ecosystem. It connects to [Alvara Protocol](https://alvara.xyz)'s ERC-7621 factory on **Base mainnet** to programmatically **discover, create, and verify BSKT (Basket Token) positions** — multi-token index funds represented as a single ERC-20 LP token.
+Every night, Pinky asks the same question: *"What are we going to do tomorrow night, Brain?"*
 
-This powers the **Bags Store integration** — enabling $KR8TIV holders to create and manage diversified on-chain baskets directly through the Bags.fm platform.
+The answer: **build on-chain index funds that anyone can create, rebalance, and manage -- programmatically.**
 
-### How It Works
+PinkBrain Alvara is the basket token engine of the [kr8tiv-ai](https://github.com/kr8tiv-ai) ecosystem. It connects Solana-side fee revenue from [Bags.fm](https://bags.fm) to Alvara Protocol's ERC-7621 factory on Base, enabling the full lifecycle of multi-asset basket tokens (BSKTs) -- from fee claiming and cross-chain bridging to basket creation, contribution, rebalancing, and emergency management.
 
-```
-  $KR8TIV holder            PinkBrain Alvara              Base Mainnet
-  ──────────────            ────────────────              ─────────────
-       |                          |                            |
-       |   "Create AI+DeFi       |                            |
-       |    basket"               |                            |
-       |─────────────────────────>|                            |
-       |                          |   discover factory         |
-       |                          |──────────────────────────> |
-       |                          |   <── factory @ 0x9ee...   |
-       |                          |                            |
-       |                          |   createBSKT(tokens,       |
-       |                          |     weights, seed ETH)     |
-       |                          |──────────────────────────> |
-       |                          |   <── BSKT LP token minted |
-       |                          |                            |
-       |                          |   verifyBSKT(address)      |
-       |                          |──────────────────────────> |
-       |                          |   <── ERC-7621 compliant   |
-       |   <── BSKT verified,     |                            |
-       |       ready on Bags      |                            |
-```
+> Part of the **Pinky and the Brain** product suite.
+> $BRAIN token on Solana | [pinkyandthebrain.fun](https://pinkyandthebrain.fun)
 
 ---
 
-## Key Features
+## What Are BSKT Tokens?
 
-<table>
-<tr><td width="30%"><b>Factory Discovery</b></td><td>Automatically discovers Alvara's BSKT factory contract from on-chain data — no hardcoded addresses needed. Traces from the ALVA token deployer through contract interactions and scores candidates by factory signals.</td></tr>
-<tr><td><b>ERC-7621 Verification</b></td><td>Full compliance checker for BSKT tokens — validates ERC-165 interface support, constituent weights sum to 10000 bps, non-zero supply, valid ownership (ERC-173), and ERC-20 metadata.</td></tr>
-<tr><td><b>Proxy Detection</b></td><td>EIP-1967 proxy pattern detection reads implementation and admin storage slots to resolve the actual contract logic behind upgradeable proxies.</td></tr>
-<tr><td><b>BSKT Creation</b></td><td>Programmatic basket creation with gas estimation, MEV protection analysis, revert reason extraction, and event log decoding to extract the new BSKT address.</td></tr>
-<tr><td><b>MEV Analysis</b></td><td>When direct creation fails (signature-gated factories), analyzes recent successful transactions to reverse-engineer signing requirements and swap data patterns.</td></tr>
-<tr><td><b>Multi-Explorer API</b></td><td>Dual-backend block explorer support — Blockscout (free, no key) as primary, Etherscan V2 as fallback. Rate-limited with exponential backoff and automatic retries.</td></tr>
-</table>
+A **BSKT** (Basket Token) is an on-chain index fund implemented as a single ERC-20 LP token under the [ERC-7621](https://eips.ethereum.org/EIPS/eip-7621) standard. Each BSKT holds multiple constituent tokens at defined weights (basis points summing to 10,000), allowing holders to gain diversified exposure through one token.
 
----
+Think of it as an ETF -- but permissionless, transparent, and composable.
 
-## Bags Store Integration
-
-PinkBrain Alvara is designed to plug into the **Bags.fm store** as a basket creation and management tool for $BRAIN token holders:
-
-| Integration Point | Description |
+| Property | Detail |
 |---|---|
-| **Basket Discovery** | Browse existing BSKTs on Base via the factory index |
-| **One-Click Creation** | Create diversified baskets with configurable token weights |
-| **Compliance Verification** | Verify any BSKT meets ERC-7621 spec before listing |
-| **Fee Sharing** | Revenue from BSKT operations flows back to $BRAIN holders via Bags.fm |
-| **Portfolio Tracking** | Read constituent tokens, weights, reserves, and total basket value on-chain |
-
-### Pinky and the Brain Ecosystem
-
-Part of the **Pinky and the Brain** product suite powered by the **$BRAIN** token on Solana through Bags.fm fee-sharing infrastructure.
+| **Standard** | ERC-7621 (Multi-Token Basket) |
+| **Weight System** | Basis points (10,000 bps = 100%) |
+| **Proxy Pattern** | EIP-1967 Transparent Upgradeable |
+| **Chain** | Base Mainnet (Chain ID 8453) |
+| **Factory** | Alvara Protocol factory contracts |
 
 ---
 
 ## Architecture
 
 ```
+                        SOLANA                                    BASE
+  +-------------------------------------------------+  +---------------------------+
+  |                                                   |  |                           |
+  |  Bags.fm Fee Share                                |  |   Alvara ERC-7621         |
+  |  +-----------+    +------------+                  |  |   +-----------------+     |
+  |  | $BRAIN    |--->| Fee Claim  |                  |  |   | BSKT Factory    |     |
+  |  | holders   |    | (bags SDK) |                  |  |   | (auto-discovered)|    |
+  |  +-----------+    +-----+------+                  |  |   +--------+--------+     |
+  |                         |                         |  |            |              |
+  |                         v                         |  |            v              |
+  |                   +-----+------+                  |  |   +--------+--------+     |
+  |                   | Jupiter    |                  |  |   | BSKT Tokens     |     |
+  |                   | SOL->USDC  |                  |  |   | (ERC-20 LP)     |     |
+  |                   +-----+------+                  |  |   +--------+--------+     |
+  |                         |                         |  |            |              |
+  |                         v                         |  |            v              |
+  |                   +-----+------+   deBridge DLN   |  |   +--------+--------+     |
+  |                   | Bridge     |----------------->|  |   | Rebalance /     |     |
+  |                   | USDC->Base |                  |  |   | Contribute /    |     |
+  |                   +------------+                  |  |   | Emergency       |     |
+  |                                                   |  |   +-----------------+     |
+  +-------------------------------------------------+  +---------------------------+
+
+                              |
+                              v
+
+                    +-------------------+
+                    | Outbound Pipeline |
+                    | (claim -> swap -> |
+                    |  bridge -> BSKT)  |
+                    +-------------------+
+                              |
+                              v
+                    +-------------------+
+                    |   Scheduler       |
+                    |   (BullMQ cron)   |
+                    +-------------------+
+                              |
+                              v
+                    +-------------------+
+                    |   REST API        |
+                    |   (Fastify)       |
+                    +-------------------+
+```
+
+---
+
+## Feature Set
+
+### On-Chain Operations
+
+| Feature | Description |
+|---|---|
+| **Factory Discovery** | Traces the ALVA token deployer on Base, enumerates deployed contracts, scores candidates by factory signals, and resolves the verified ABI. No hardcoded addresses. |
+| **BSKT Creation** | Programmatic basket creation via the factory with gas estimation, MEV protection analysis, revert reason extraction, and event log decoding. |
+| **BSKT Contribution** | Contribute ETH to existing baskets. Fetches backend-signed swap routes from the Alvara API, calls `contribute()`, and verifies LP token balance increase. |
+| **BSKT Rebalancing** | Change token allocations on live baskets. Validates ownership, fetches signed swap routes, and executes `rebalance()` with configurable modes. |
+| **Emergency Stables** | Panic button: convert a BSKT to ~95% USDT + 5% ALVA. Outputs a snapshot JSON for later revert to original composition. |
+| **ERC-7621 Verification** | Full compliance checker -- ERC-165 interface support, weight validation (sum to 10,000 bps), supply checks, ERC-173 ownership, and ERC-20 metadata. |
+| **MEV Analysis** | Read-only analysis of recent `createBSKT` transactions to reverse-engineer signing requirements and swap data patterns. |
+| **Proxy Detection** | EIP-1967 proxy pattern detection reads implementation and admin storage slots to resolve actual contract logic. |
+| **Registry Deployment** | Deploy the DivestmentRegistry contract to Base or Ethereum mainnet. |
+
+### Cross-Chain Pipeline
+
+| Feature | Description |
+|---|---|
+| **Bags.fm Fee Share** | Query admin status, update fee share config, query claimable positions, and claim accumulated fees via the Bags SDK. |
+| **Jupiter Swaps** | SOL to USDC conversion via Jupiter Ultra V3 with estimate-only dry-run mode. |
+| **deBridge Bridging** | Bridge USDC from Solana to Base via deBridge DLN API with estimation, execution, and fulfillment tracking. |
+| **Outbound Pipeline** | End-to-end automation: claim fees, swap to USDC, bridge to Base, and execute BSKT operations. |
+| **Holder Resolution** | Resolve top holders of any SPL token mint on Solana with DAS API support for faster resolution. |
+
+### Infrastructure
+
+| Feature | Description |
+|---|---|
+| **Accumulation Scheduler** | BullMQ repeatable jobs on configurable cron schedules for automated pipeline execution. |
+| **REST API** | Fastify server for fund management, pipeline status, and external integrations. |
+| **PostgreSQL Data Model** | Full fund lifecycle tracking -- creation, state machines, wallet association, divestment configs, pipeline runs, and transaction recording. |
+| **Multi-Explorer API** | Dual-backend block explorer support (Blockscout primary, Etherscan V2 fallback) with rate limiting and exponential backoff. |
+
+---
+
+## Project Structure
+
+```
 PinkBrain-Alvara/
+|
 +-- src/
-|   +-- alvara/
-|   |   +-- erc7621.ts          # ERC-7621 ABI, read functions, BSKT verifier
-|   |   +-- factory.ts          # Factory wrapper — state reads, BSKT creation, calldata decoder
-|   |
-|   +-- config/
-|   |   +-- chains.ts           # Base chain config, known addresses (ALVA, WETH, USDC)
-|   |   +-- discovered-contracts.json   # Auto-generated factory discovery output
-|   |
-|   +-- utils/
-|       +-- basescan.ts         # Dual block explorer API (Blockscout + Etherscan V2)
-|       +-- proxy.ts            # EIP-1967 proxy detection
+|   +-- alvara/              # ERC-7621 ABI, factory wrapper, rebalance, contribute
+|   +-- api/                 # Fastify REST server
+|   +-- bags/                # Bags SDK client, fee share, fee claim
+|   +-- config/              # Chain configs, Solana config, discovered contracts
+|   +-- db/                  # Drizzle ORM schema, connection, fund repository
+|   +-- debridge/            # deBridge DLN API, Solana transaction building
+|   +-- holders/             # SPL token holder resolution
+|   +-- jupiter/             # Jupiter Ultra V3 swap integration
+|   +-- pipeline/            # Outbound pipeline orchestration
+|   +-- registry/            # DivestmentRegistry deployment
+|   +-- scheduler/           # BullMQ queue, accumulation worker
+|   +-- utils/               # Basescan API, proxy detection
 |
 +-- scripts/
-|   +-- discover-factory.ts     # On-chain factory discovery pipeline
-|   +-- create-bskt.ts          # BSKT creation with MEV analysis fallback
+|   +-- discover-factory.ts       # On-chain factory discovery
+|   +-- create-bskt.ts            # BSKT creation with MEV fallback
+|   +-- verify-bskt.ts            # ERC-7621 compliance checker
+|   +-- contribute-bskt.ts        # Contribute ETH to a BSKT
+|   +-- rebalance-bskt.ts         # Change basket allocations
+|   +-- emergency-stables.ts      # Panic conversion + snapshot revert
+|   +-- analyze-mev.ts            # Read-only MEV transaction analysis
+|   +-- bags-fee-share.ts         # Fee share admin and claiming
+|   +-- jupiter-swap.ts           # SOL->USDC via Jupiter
+|   +-- bridge-sol-to-base.ts     # USDC bridge via deBridge DLN
+|   +-- check-bridge-status.ts    # Bridge fulfillment tracker
+|   +-- resolve-holders.ts        # SPL token holder resolution
+|   +-- outbound-pipeline.ts      # End-to-end pipeline runner
+|   +-- db-seed.ts                # Test fund seeding
+|   +-- deploy-registry.ts        # DivestmentRegistry deployer
+|   +-- discover-alvara-api.ts    # Contract topology discovery
+|   +-- fetch-bsktpair-abi.ts     # BSKTPair ABI via beacon chain
+|   +-- start-scheduler.ts        # BullMQ scheduler entry point
+|   +-- start-api.ts              # REST API entry point
 |
 +-- package.json
 +-- tsconfig.json
@@ -120,21 +182,27 @@ PinkBrain-Alvara/
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
-| **Language** | TypeScript 5.7 (strict mode) |
-| **Chain Client** | Viem 2.23 |
-| **Target Chain** | Base Mainnet (Chain ID 8453) |
-| **Token Standard** | ERC-7621 (Multi-Token Basket) |
-| **Proxy Standard** | EIP-1967 (Transparent Upgradeable Proxy) |
-| **Block Explorer** | Blockscout (primary) / Etherscan V2 (fallback) |
-| **Runtime** | Node.js >= 20, ESM modules |
+| Layer | Technology |
+|---|---|
+| **Language** | TypeScript 5.7 (strict, ESM) |
+| **EVM Client** | Viem 2.23 |
+| **Solana Client** | @solana/web3.js 1.98 |
+| **Bags Integration** | @bagsfm/bags-sdk 1.3 |
+| **Database** | PostgreSQL via Drizzle ORM |
+| **Queue** | BullMQ (Redis-backed) |
+| **API Server** | Fastify 5.8 |
+| **Bridge** | deBridge DLN |
+| **DEX** | Jupiter Ultra V3 |
+| **Target Chain** | Base Mainnet (8453) |
+| **Token Standard** | ERC-7621 / EIP-1967 |
+| **Block Explorers** | Blockscout + Etherscan V2 |
+| **Runtime** | Node.js >= 20 |
 
 ---
 
 ## Quick Start
 
-### 1. Install
+### 1. Clone and Install
 
 ```bash
 git clone https://github.com/kr8tiv-ai/PinkBrain-Alvara.git
@@ -142,93 +210,134 @@ cd PinkBrain-Alvara
 npm install
 ```
 
-### 2. Configure
+### 2. Configure Environment
 
 ```bash
 cp .env.example .env
-# Optional: add BASESCAN_API_KEY for faster API calls
-# Required for creation: add PRIVATE_KEY
 ```
 
-### 3. Discover Factory
+| Variable | Required | Purpose |
+|---|---|---|
+| `BASESCAN_API_KEY` | Optional | Etherscan V2 unified key for faster API calls |
+| `PRIVATE_KEY` | For Base ops | Hex-encoded key for BSKT creation/management |
+| `SOL_PRIVATE_KEY` | For Solana ops | Base58-encoded key for swaps, bridging, claiming |
+| `SOL_RPC_URL` | Optional | Solana RPC (defaults to public mainnet-beta) |
+| `BAGS_API_KEY` | For fee share | Bags.fm developer API key |
+| `DATABASE_URL` | For pipeline | PostgreSQL connection string |
+
+### 3. Discover the Factory
 
 ```bash
 npm run discover
 ```
 
-Traces the ALVA token deployer on Base, enumerates all deployed contracts and interaction targets, scores candidates by factory signals (name, ABI functions, proxy patterns), fetches the verified ABI, and writes the result to `src/config/discovered-contracts.json`.
+Traces the ALVA deployer on Base, scores contract candidates, fetches verified ABIs, and writes results to `src/config/discovered-contracts.json`.
 
-### 4. Create a BSKT
+### 4. Create a Basket
 
 ```bash
 PRIVATE_KEY=0x... npm run create-bskt
 ```
 
-Attempts to create a basket via the factory. If MEV protection blocks the direct call, automatically falls back to on-chain MEV analysis and writes findings to `src/config/mev-findings.json`.
-
-### 5. Verify a BSKT
+### 5. Verify ERC-7621 Compliance
 
 ```bash
 npm run verify-bskt
 ```
 
-Runs ERC-7621 compliance checks against a BSKT address — interface support, weight validation, supply checks, ownership, and metadata.
+---
+
+## Commands Reference
+
+### Base Chain Operations
+
+| Command | Script | Description |
+|---|---|---|
+| `npm run discover` | `discover-factory.ts` | Auto-discover Alvara factory contracts |
+| `npm run create-bskt` | `create-bskt.ts` | Create a new BSKT via the factory |
+| `npm run verify-bskt` | `verify-bskt.ts` | Run ERC-7621 compliance checks |
+
+### Solana Operations
+
+| Command | Script | Description |
+|---|---|---|
+| `npm run bags-fee-share` | `bags-fee-share.ts` | Query and claim Bags.fm fee shares |
+| `npm run jupiter-swap` | `jupiter-swap.ts` | Swap SOL to USDC via Jupiter |
+| `npm run jupiter-estimate` | `jupiter-swap.ts` | Estimate swap without executing |
+| `npm run resolve-holders` | `resolve-holders.ts` | Resolve top SPL token holders |
+
+### Cross-Chain
+
+| Command | Script | Description |
+|---|---|---|
+| `npm run bridge` | `bridge-sol-to-base.ts` | Bridge USDC from Solana to Base |
+| `npm run bridge-estimate` | `bridge-sol-to-base.ts` | Estimate bridge cost (dry run) |
+| `npm run bridge-status` | `check-bridge-status.ts` | Check bridge fulfillment status |
+| `npm run outbound-pipeline` | `outbound-pipeline.ts` | Full claim -> swap -> bridge pipeline |
+
+### Infrastructure
+
+| Command | Script | Description |
+|---|---|---|
+| `npm run scheduler` | `start-scheduler.ts` | Start BullMQ accumulation scheduler |
+| `npm run api` | `start-api.ts` | Start Fastify REST API server |
+| `npm run db-seed` | `db-seed.ts` | Seed database with test fund data |
 
 ---
 
 ## On-Chain Contracts
 
-| Contract | Address | Role |
-|----------|---------|------|
-| **ALVA Token** | `0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb` | Alvara governance token (Base) |
-| **BSKT Factory** | Auto-discovered via `npm run discover` | Creates and indexes BSKTs |
-| **WETH** | `0x4200000000000000000000000000000000000006` | Wrapped ETH on Base |
-| **USDC** | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Native USDC on Base |
+| Contract | Address | Chain |
+|---|---|---|
+| **ALVA Token** | `0xCC68F95cf050E769D46d8d133Bf4193fCBb3f1Eb` | Base |
+| **BSKT Factory** | Auto-discovered via `npm run discover` | Base |
+| **WETH** | `0x4200000000000000000000000000000000000006` | Base |
+| **USDC** | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Base |
 
 ---
 
-## ERC-7621 Verification Report
-
-The verifier produces a structured JSON report:
+## ERC-7621 Verification Output
 
 ```json
 {
   "verified": true,
   "bsktAddress": "0x...",
-  "interfaceSupported": true,
-  "name": "Example Basket",
-  "symbol": "EBSKT",
+  "name": "AI+DeFi Index",
+  "symbol": "AIDX",
   "constituents": [
     { "token": "0x...", "weight": "5000" },
-    { "token": "0x...", "weight": "5000" }
+    { "token": "0x...", "weight": "3000" },
+    { "token": "0x...", "weight": "2000" }
   ],
   "totalWeightBps": "10000",
-  "totalSupply": "1000000000000000000",
-  "owner": "0x...",
   "checks": [
-    { "name": "ERC-165 supported", "passed": true },
-    { "name": "ERC-7621 interface", "passed": true },
+    { "name": "ERC-165 supported",     "passed": true },
+    { "name": "ERC-7621 interface",     "passed": true },
     { "name": "constituents non-empty", "passed": true },
-    { "name": "weights sum to 10000", "passed": true },
-    { "name": "totalSupply > 0", "passed": true },
-    { "name": "owner is non-zero", "passed": true },
-    { "name": "has name", "passed": true },
-    { "name": "has symbol", "passed": true }
+    { "name": "weights sum to 10000",   "passed": true },
+    { "name": "totalSupply > 0",        "passed": true },
+    { "name": "owner is non-zero",      "passed": true },
+    { "name": "has name",               "passed": true },
+    { "name": "has symbol",             "passed": true }
   ]
 }
 ```
 
 ---
 
-## The Pinky and the Brain Ecosystem
+## The $BRAIN Ecosystem
 
-All **PinkBrain** products are powered by the **$BRAIN** token on Solana through Bags.fm fee-sharing infrastructure.
+All PinkBrain products are powered by the **$BRAIN** token on Solana through Bags.fm fee-sharing infrastructure.
 
-| Project | Description |
-|---------|-------------|
-| **[PinkBrain Router](https://github.com/kr8tiv-ai/PinkBrain-Router)** | Bags.fm fee-funded OpenRouter API credits for 300+ AI models |
+| Project | What It Does |
+|---|---|
+| **[PinkBrain Router](https://github.com/kr8tiv-ai/PinkBrain-Router)** | Fee-funded OpenRouter API credits for 300+ AI models |
 | **[PinkBrain LP](https://github.com/kr8tiv-ai/PinkBrain-lp)** | Auto-compounding Meteora DAMM v2 liquidity |
 | **[PinkBrain Alvara](https://github.com/kr8tiv-ai/PinkBrain-Alvara)** | ERC-7621 basket token infrastructure (this repo) |
+
+> *"The same thing we do every night -- try to take over the world."*
+>
+> One basket at a time.
 
 ---
 
@@ -236,16 +345,10 @@ All **PinkBrain** products are powered by the **$BRAIN** token on Solana through
 
 Issues and PRs welcome at [kr8tiv-ai/PinkBrain-Alvara](https://github.com/kr8tiv-ai/PinkBrain-Alvara).
 
----
-
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT -- see [LICENSE](LICENSE) for details.
 
 ---
 
-<div align="center">
-
-Built by [Matt Haynes](https://github.com/Matt-Aurora-Ventures) / [kr8tiv-ai](https://github.com/kr8tiv-ai)
-
-</div>
+Built by [Matt Haynes](https://github.com/Matt-Aurora-Ventures) / [kr8tiv-ai](https://github.com/kr8tiv-ai) | [pinkyandthebrain.fun](https://pinkyandthebrain.fun)
