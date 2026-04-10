@@ -105,6 +105,7 @@ Think of it as an ETF -- but permissionless, transparent, and composable.
 | **Factory Discovery** | Traces the ALVA token deployer on Base, enumerates deployed contracts, scores candidates by factory signals, and resolves the verified ABI. No hardcoded addresses. |
 | **BSKT Creation** | Programmatic basket creation via the factory with gas estimation, MEV protection analysis, revert reason extraction, and event log decoding. |
 | **BSKT Contribution** | Contribute ETH to existing baskets. Fetches backend-signed swap routes from the Alvara API, calls `contribute()`, and verifies LP token balance increase. |
+| **BSKT Redemption** | Burn LP tokens on a BSKTPair, swap underlying tokens back to ETH via backend-signed 1inch routes, and verify ETH balance increase. Uses `withdrawETH()` on the BSKT beacon proxy (`src/alvara/redeem.ts`). |
 | **BSKT Rebalancing** | Change token allocations on live baskets. Validates ownership, fetches signed swap routes, and executes `rebalance()` with configurable modes. |
 | **Emergency Stables** | Panic button: convert a BSKT to ~95% USDT + 5% ALVA. Outputs a snapshot JSON for later revert to original composition. |
 | **ERC-7621 Verification** | Full compliance checker -- ERC-165 interface support, weight validation (sum to 10,000 bps), supply checks, ERC-173 ownership, and ERC-20 metadata. |
@@ -130,6 +131,8 @@ Think of it as an ETF -- but permissionless, transparent, and composable.
 | **REST API** | Fastify server for fund management, pipeline status, and external integrations. |
 | **PostgreSQL Data Model** | Full fund lifecycle tracking -- creation, state machines, wallet association, divestment configs, pipeline runs, and transaction recording. |
 | **Multi-Explorer API** | Dual-backend block explorer support (Blockscout primary, Etherscan V2 fallback) with rate limiting and exponential backoff. |
+| **ABI Fetching** | Resolve the BSKTPair ABI via the beacon chain proxy pattern (`scripts/fetch-bsktpair-abi.ts`). |
+| **Contract Discovery API** | Crawl Alvara's on-chain contract topology -- factory, beacon, implementation -- and output a discovery map (`scripts/discover-alvara-api.ts`). |
 
 ---
 
